@@ -1,0 +1,419 @@
+"use client";
+
+import React, { useState } from "react";
+import {
+  IoClose,
+  IoPersonAdd,
+  IoCopyOutline,
+  IoCheckmark,
+} from "react-icons/io5";
+import { liveSocketService } from "../services/live-socket.service";
+import { toast } from "react-toastify";
+import { useLiveParticipantsQuery } from "../api/live-participants.queries";
+
+export interface CohostParticipant {
+  userId: string;
+  username: string;
+  role: "cohost" | "viewer";
+  isMuted: boolean;
+  avatar?: string;
+}
+
+interface CohostModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  liveId: string;
+  cohosts: CohostParticipant[];
+  onUpdateCohosts: (updated: CohostParticipant[]) => void;
+}
+
+export default function CohostModal({
+  isOpen,
+  onClose,
+  liveId,
+  cohosts,
+  onUpdateCohosts,
+}: CohostModalProps) {
+  const [invitedUserIds, setInvitedUserIds] = useState<Set<string>>(
+    new Set()
+  );
+
+  const { data: participantsData, isLoading } = useLiveParticipantsQuery(
+    liveId,
+    isOpen
+  );
+
+  if (!isOpen) return null;
+
+  const viewersList =
+    Array.isArray(participantsData?.viewers) &&
+    participantsData.viewers.length > 0
+      ? participantsData.viewers
+      : Array.isArray(participantsData?.participants)
+      ? participantsData.participants.filter((p) => p.role !== "host")
+      : [];
+
+  const handleInviteUser = async (userId: string, userName: string) => {
+    try {
+      const res = await liveSocketService.inviteCohost(liveId, userId);
+
+      if (res.success) {
+        toast.success(`Co-host invitation sent to ${userName}!`);
+
+        setInvitedUserIds((prev) => {
+          const next = new Set(prev);
+          next.add(userId);
+          return next;
+        });
+
+        if (!cohosts.some((c) => c.userId === userId)) {
+          onUpdateCohosts([
+            ...cohosts,
+            {
+              userId,
+              username: userName,
+              role: "cohost",
+              isMuted: false,
+            },
+          ]);
+        }
+      } else {
+        toast.error(res.message || "Failed to send invitation.");
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to send invitation.");
+    }
+  };
+
+  const handleCopyInviteLink = async () => {
+    if (typeof window !== "undefined") {
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        toast.success("Invite link copied to clipboard!");
+      } catch {
+        toast.error("Failed to copy invite link.");
+      }
+    }
+  };
+
+  const cohostCount = cohosts.length;
+  const openSlots = Math.max(0, 5 - cohostCount);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <div
+        className="
+          w-full max-w-[360px]
+          rounded-[22px]
+          bg-white
+          text-[#171717]
+          shadow-[0_20px_60px_rgba(0,0,0,0.35)]
+          overflow-hidden
+        "
+      >
+        {/* Header */}
+        <div className="px-4 pt-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-[15px] font-bold text-[#171717]">
+              Invite Guests
+            </h3>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="
+                flex h-[22px] w-[22px]
+                items-center justify-center
+                rounded-full
+                bg-[#8d8d8d]
+                text-white
+                transition
+                hover:bg-[#707070]
+              "
+            >
+              <IoClose className="text-[14px]" />
+            </button>
+          </div>
+
+          {/* Guest slots */}
+          <div className="mt-2 flex items-center gap-[5px]">
+            {Array.from({ length: 5 }).map((_, index) => {
+              const filled = index < cohostCount;
+
+              return (
+                <div
+                  key={index}
+                  className={`
+                    flex h-[20px] w-[20px]
+                    items-center justify-center
+                    rounded-full
+                    border
+                    ${
+                      filled
+                        ? "border-[#08add0] bg-[#08add0]"
+                        : "border-[#a8a8a8] bg-white"
+                    }
+                  `}
+                >
+                  {filled ? (
+                    <span className="h-full w-full rounded-full bg-[#08add0]" />
+                  ) : (
+                    <span className="text-[14px] leading-none text-[#777]">
+                      +
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+
+            <span className="ml-1 text-[8px] font-medium text-[#888]">
+              {cohostCount}/5 guests -
+            </span>
+
+            <span className="text-[8px] font-semibold text-[#08a9cf]">
+              {openSlots} slots open
+            </span>
+          </div>
+
+          <p className="mt-3 text-[9px] font-medium text-[#9a9a9a]">
+            Followers currently watching this stream
+          </p>
+        </div>
+
+        {/* Active Co-hosts (Guests) */}
+        {cohosts.length > 0 && (
+          <div className="px-3 pb-2 pt-1 border-b border-[#eeeeee]">
+            <p className="text-[9px] font-medium text-[#9a9a9a] mb-1.5">
+              Active Guests
+            </p>
+            <div className="flex flex-col gap-[6px] max-h-[140px] overflow-y-auto mb-2 pr-0.5">
+              {cohosts.map((cohost) => {
+                const avatar = cohost.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80";
+                return (
+                  <div
+                    key={cohost.userId}
+                    className="
+                      flex items-center justify-between
+                      rounded-[12px]
+                      border border-cyan-100
+                      bg-cyan-50/20
+                      px-3 py-[8px]
+                      shadow-[0_1px_3px_rgba(0,0,0,0.02)]
+                    "
+                  >
+                    <div className="flex min-w-0 items-center gap-[9px]">
+                      <div className="relative shrink-0">
+                        <img
+                          src={avatar}
+                          alt={cohost.username}
+                          className="
+                            h-[32px] w-[32px]
+                            rounded-full
+                            border border-cyan-200
+                            object-cover
+                          "
+                        />
+                        <span
+                          className="
+                            absolute bottom-[-1px] right-[-1px]
+                            h-[7px] w-[7px]
+                            rounded-full
+                            border-[1.5px] border-white
+                            bg-[#21c96b]
+                          "
+                        />
+                      </div>
+                      <span
+                        className="
+                          truncate
+                          text-[10px]
+                          font-semibold
+                          text-[#242424]
+                        "
+                      >
+                        {cohost.username}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          console.log(`[HMS ROLE] Host removing cohost: ${cohost.username} (userId: ${cohost.userId})`);
+                          const res = await liveSocketService.kickCohost(liveId, cohost.userId);
+                          if (res.success) {
+                            toast.success(`Removed guest ${cohost.username}.`);
+                            onUpdateCohosts(cohosts.filter((c) => c.userId !== cohost.userId));
+                          } else {
+                            toast.error(res.message || "Failed to remove guest.");
+                          }
+                        } catch (err: any) {
+                          toast.error(err?.message || "Failed to remove guest.");
+                        }
+                      }}
+                      className="
+                        flex shrink-0 items-center justify-center
+                        rounded-[7px]
+                        bg-red-500
+                        px-[10px]
+                        py-[6px]
+                        text-[9px]
+                        font-semibold
+                        text-white
+                        transition-all
+                        hover:bg-red-600
+                        active:scale-95
+                      "
+                    >
+                      Remove
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Participants */}
+        <div className="px-3 pb-2 pt-2">
+          {isLoading ? (
+            <div className="py-8 text-center text-[10px] text-[#999]">
+              Loading viewers...
+            </div>
+          ) : viewersList.length === 0 ? (
+            <div className="py-8 text-center text-[10px] text-[#999]">
+              No viewers currently watching this stream.
+            </div>
+          ) : (
+            <div className="flex max-h-[310px] flex-col gap-[6px] overflow-y-auto pr-0.5">
+              {viewersList.map((item, idx) => {
+                const uId =
+                  item.user?._id || item._id || `user-${idx}`;
+
+                const uName = item.user?.name || "Viewer";
+
+                const uAvatar =
+                  item.user?.avatar ||
+                  "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80";
+
+                const isInvited =
+                  invitedUserIds.has(uId) ||
+                  cohosts.some((c) => c.userId === uId);
+
+                return (
+                  <div
+                    key={uId}
+                    className="
+                      flex items-center justify-between
+                      rounded-[12px]
+                      border border-[#eeeeee]
+                      bg-white
+                      px-3 py-[8px]
+                      shadow-[0_1px_3px_rgba(0,0,0,0.03)]
+                    "
+                  >
+                    {/* User */}
+                    <div className="flex min-w-0 items-center gap-[9px]">
+                      <div className="relative shrink-0">
+                        <img
+                          src={uAvatar}
+                          alt={uName}
+                          className="
+                            h-[32px] w-[32px]
+                            rounded-full
+                            border border-[#eeeeee]
+                            object-cover
+                          "
+                        />
+
+                        {/* Online dot */}
+                        <span
+                          className="
+                            absolute bottom-[-1px] right-[-1px]
+                            h-[7px] w-[7px]
+                            rounded-full
+                            border-[1.5px] border-white
+                            bg-[#21c96b]
+                          "
+                        />
+                      </div>
+
+                      <span
+                        className="
+                          truncate
+                          text-[10px]
+                          font-semibold
+                          text-[#242424]
+                        "
+                      >
+                        {uName}
+                      </span>
+                    </div>
+
+                    {/* Invite */}
+                    <button
+                      type="button"
+                      disabled={isInvited}
+                      onClick={() => handleInviteUser(uId, uName)}
+                      className={`
+                        flex shrink-0 items-center justify-center gap-1
+                        rounded-[7px]
+                        px-[10px]
+                        py-[6px]
+                        text-[9px]
+                        font-semibold
+                        transition-all
+                        ${
+                          isInvited
+                            ? "cursor-not-allowed bg-[#eeeeee] text-[#999]"
+                            : "bg-[#08acd1] text-white hover:bg-[#0799bb] active:scale-95"
+                        }
+                      `}
+                    >
+                      {isInvited ? (
+                        <>
+                          <IoCheckmark className="text-[11px]" />
+                          Invited
+                        </>
+                      ) : (
+                        <>
+                          <IoPersonAdd className="text-[10px]" />
+                          Invite
+                        </>
+                      )}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-3 pb-3 pt-1">
+          <button
+            type="button"
+            onClick={handleCopyInviteLink}
+            className="
+              flex w-full
+              items-center justify-center gap-2
+              rounded-[10px]
+              bg-[#08acd1]
+              py-[11px]
+              text-[10px]
+              font-bold
+              text-white
+              shadow-[0_3px_8px_rgba(8,172,209,0.22)]
+              transition-all
+              hover:bg-[#0799bb]
+              active:scale-[0.99]
+            "
+          >
+            <IoCopyOutline className="text-[13px]" />
+            Copy Invite Link
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
