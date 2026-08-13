@@ -122,6 +122,13 @@ export default function LiveStreamPageView() {
     }) || "co-host";
   }, [availableRoles]);
 
+  const viewerRoleName = useMemo(() => {
+    return availableRoles.find((role) => {
+      const name = role.toLowerCase();
+      return name === "viewer" || name === "audience" || name === "listener";
+    }) || "viewer";
+  }, [availableRoles]);
+
   // Stream controls state persisted from pre-stream setup
   const [isMicOn, setIsMicOn] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
@@ -138,6 +145,20 @@ export default function LiveStreamPageView() {
     }
     return true;
   });
+
+  // Sync local mic state with HMS track status (e.g. if muted remotely by host)
+  useEffect(() => {
+    if (localPeerAudioTrack) {
+      setIsMicOn(localPeerAudioTrack.enabled);
+    }
+  }, [localPeerAudioTrack?.enabled]);
+
+  // Sync local camera state with HMS track status (e.g. if turned off remotely by host)
+  useEffect(() => {
+    if (localPeerVideoTrack) {
+      setIsCameraOn(localPeerVideoTrack.enabled);
+    }
+  }, [localPeerVideoTrack?.enabled]);
   const [isMirrored, setIsMirrored] = useState(false);
 
   // Live session statistics
@@ -403,11 +424,11 @@ export default function LiveStreamPageView() {
         if (amIHost) {
           const peer = hmsPeersRef.current.find((p) => p.customerUserId === userId);
           if (peer) {
-            console.log(`[HMS ROLE] Host removing co-host, changing role: demoting peer ${peer.name} (${peer.id}) to viewer...`);
+            console.log(`[HMS ROLE] Host removing co-host, changing role: demoting peer ${peer.name} (${peer.id}) to ${viewerRoleName}...`);
             hmsActions
-              .changeRoleOfPeer(peer.id, "viewer", true)
+              .changeRoleOfPeer(peer.id, viewerRoleName, true)
               .then(() => {
-                console.log(`[HMS ROLE] Role change successful: changed peer ${peer.name} back to viewer`);
+                console.log(`[HMS ROLE] Role change successful: changed peer ${peer.name} back to ${viewerRoleName}`);
               })
               .catch((err) => {
                 console.error(`[HMS ROLE] Role change failed for peer ${peer.name}:`, err);
@@ -537,7 +558,7 @@ export default function LiveStreamPageView() {
       };
 
       enableMedia();
-    } else if (currentRole === "viewer") {
+    } else if (currentRole === viewerRoleName.toLowerCase()) {
       console.log("[100ms Role Observer] Detected transition to viewer. Disabling local media publishing...");
       
       const disableMedia = async () => {
@@ -556,7 +577,7 @@ export default function LiveStreamPageView() {
 
       disableMedia();
     }
-  }, [localPeer?.roleName, hmsActions]);
+  }, [localPeer?.roleName, hmsActions, viewerRoleName]);
 
   const handleConfirmEndLive = async () => {
     try {
@@ -600,6 +621,13 @@ export default function LiveStreamPageView() {
 
   const handleLeaveStream = async () => {
     try {
+      if (isCohost && localPeer?.customerUserId) {
+        try {
+          await liveSocketService.kickCohost(liveId, localPeer.customerUserId);
+        } catch (err) {
+          console.warn("Failed to remove co-host state on leave:", err);
+        }
+      }
       try {
         await hmsActions.leave();
       } catch (e) {
@@ -659,54 +687,7 @@ export default function LiveStreamPageView() {
               </div>
 
               {/* Co-Host / Host Media Control Buttons (Mic & Camera) */}
-              {(isHost || isCohost) && !isLiveEnded && (
-                <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md p-1 rounded-full border border-white/10">
-                  {/* Mic Toggle Button */}
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const nextState = !isMicOn;
-                      try {
-                        await hmsActions.setLocalAudioEnabled(nextState);
-                        liveSocketService.selfMute(liveId, !nextState);
-                        setIsMicOn(nextState);
-                      } catch (err) {
-                        console.warn("Failed to toggle local audio:", err);
-                      }
-                    }}
-                    className={`p-1.5 rounded-full transition-all cursor-pointer ${
-                      isMicOn
-                        ? "bg-white/20 hover:bg-white/30 text-white"
-                        : "bg-red-500 hover:bg-red-600 text-white shadow-md"
-                    }`}
-                    title={isMicOn ? "Mute Mic" : "Unmute Mic"}
-                  >
-                    {isMicOn ? <Mic className="w-3.5 h-3.5" /> : <MicOff className="w-3.5 h-3.5" />}
-                  </button>
-
-                  {/* Camera Toggle Button */}
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const nextState = !isCameraOn;
-                      try {
-                        await hmsActions.setLocalVideoEnabled(nextState);
-                        setIsCameraOn(nextState);
-                      } catch (err) {
-                        console.warn("Failed to toggle local video:", err);
-                      }
-                    }}
-                    className={`p-1.5 rounded-full transition-all cursor-pointer ${
-                      isCameraOn
-                        ? "bg-white/20 hover:bg-white/30 text-white"
-                        : "bg-red-500 hover:bg-red-600 text-white shadow-md"
-                    }`}
-                    title={isCameraOn ? "Turn Camera Off" : "Turn Camera On"}
-                  >
-                    {isCameraOn ? <Video className="w-3.5 h-3.5" /> : <VideoOff className="w-3.5 h-3.5" />}
-                  </button>
-                </div>
-              )}
+             
 
               {/* Invite Co-Host Button (Host Only) */}
               {isHost && !isLiveEnded && (

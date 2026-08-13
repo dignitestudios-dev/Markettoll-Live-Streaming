@@ -6,7 +6,18 @@ import {
   IoPersonAdd,
   IoCopyOutline,
   IoCheckmark,
+  IoMicOutline,
+  IoMicOffOutline,
+  IoVideocamOutline,
+  IoVideocamOffOutline,
 } from "react-icons/io5";
+import {
+  useHMSActions,
+  useHMSStore,
+  selectPeers,
+  selectAudioTrackByPeerID,
+  selectVideoTrackByPeerID,
+} from "@100mslive/react-sdk";
 import { liveSocketService } from "../services/live-socket.service";
 import { toast } from "react-toastify";
 import { useLiveParticipantsQuery } from "../api/live-participants.queries";
@@ -25,6 +36,249 @@ interface CohostModalProps {
   liveId: string;
   cohosts: CohostParticipant[];
   onUpdateCohosts: (updated: CohostParticipant[]) => void;
+}
+
+interface ParticipantRowProps {
+  uId: string;
+  uName: string;
+  uAvatar: string;
+  isCohost: boolean;
+  isInvited: boolean;
+  liveId: string;
+  onInvite: () => void;
+  onRemove: () => void;
+}
+
+function ParticipantRow({
+  uId,
+  uName,
+  uAvatar,
+  isCohost,
+  isInvited,
+  liveId,
+  onInvite,
+  onRemove,
+}: ParticipantRowProps) {
+  const hmsActions = useHMSActions();
+  const hmsPeers = useHMSStore(selectPeers) || [];
+
+  // Find corresponding 100ms peer
+  const peer = hmsPeers.find((p) => p.customerUserId === uId);
+
+  // Retrieve track objects using selectors
+  const audioTrack = useHMSStore(selectAudioTrackByPeerID(peer?.id));
+  const videoTrack = useHMSStore(selectVideoTrackByPeerID(peer?.id));
+
+  // Determine muted/enabled states.
+  const isMicEnabled = audioTrack ? audioTrack.enabled : true;
+  const isVideoEnabled = videoTrack ? videoTrack.enabled : true;
+
+  console.log("audioTrack", audioTrack);
+  console.log("videoTrack", videoTrack);
+  const handleToggleMute = async () => {
+    console.log(audioTrack,"audioTrack")
+    if (audioTrack) {
+      if (!audioTrack.enabled) {
+        toast.info("Only the co-host can unmute themselves.");
+        return; 
+      }
+      try {
+        await hmsActions.setRemoteTrackEnabled(audioTrack.id, false);
+        await liveSocketService.muteCohost(liveId, uId, true);
+        toast.info(`Muted ${uName}.`);
+      } catch (err) {
+        console.error("Failed to mute remote audio:", err);
+        toast.error("Failed to mute co-host.");
+      }
+    } else {
+      toast.warn("Guest is not actively connected to the audio room yet.");
+    }
+  };
+
+  const handleToggleCamera = async () => {
+    if (videoTrack) {
+      if (!videoTrack.enabled) {
+        toast.info("Only the co-host can turn their camera back on.");
+        return;
+      }
+      try {
+        await hmsActions.setRemoteTrackEnabled(videoTrack.id, false);
+        toast.info(`Turned off ${uName}'s camera.`);
+      } catch (err) {
+        console.error("Failed to change remote video state:", err);
+        toast.error("Failed to turn off camera.");
+      }
+    } else {
+      toast.warn("Guest is not actively connected to the video room yet.");
+    }
+  };
+
+  return (
+    <div
+      className="
+        flex items-center justify-between
+        rounded-[12px]
+        border border-[#eeeeee]
+        bg-white
+        px-3 py-[8px]
+        shadow-[0_1px_3px_rgba(0,0,0,0.03)]
+      "
+    >
+      {/* User Info */}
+      <div className="flex min-w-0 flex-1 items-center gap-[9px]">
+        <div className="relative shrink-0">
+          <img
+            src={uAvatar}
+            alt={uName}
+            className="
+              h-[32px] w-[32px]
+              rounded-full
+              border border-[#eeeeee]
+              object-cover
+            "
+          />
+          {/* Online status dot */}
+          <span
+            className="
+              absolute bottom-[-1px] right-[-1px]
+              h-[7px] w-[7px]
+              rounded-full
+              border-[1.5px] border-white
+              bg-[#21c96b]
+            "
+          />
+        </div>
+
+        <div className="flex flex-col min-w-0">
+          <span
+            className="
+              truncate
+              text-[10px]
+              font-semibold
+              text-[#242424]
+            "
+          >
+            {uName}
+          </span>
+          {isCohost && (
+            <span className="text-[8px] text-[#08acd1] font-medium mt-0.5">
+              Active Guest
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-2 shrink-0 ml-2">
+        {isCohost && (
+          <div className="flex items-center gap-1.5 mr-1">
+            {/* Mute/Unmute Button */}
+            <button
+              type="button"
+              onClick={handleToggleMute}
+              disabled={!audioTrack || !isMicEnabled}
+              title={isMicEnabled ? "Mute Guest" : "Guest is Muted"}
+              className={`
+                flex h-[24px] w-[24px] items-center justify-center rounded-full border transition-all
+                ${
+                  !audioTrack
+                    ? "border-gray-100 text-gray-300 cursor-not-allowed bg-gray-50"
+                    : isMicEnabled
+                    ? "border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+                    : "border-red-100 bg-red-50 text-red-400 cursor-not-allowed"
+                }
+              `}
+            >
+              {isMicEnabled ? (
+                <IoMicOutline className="text-[14px]" />
+              ) : (
+                <IoMicOffOutline className="text-[14px]" />
+              )}
+            </button>
+
+            {/* Camera On/Off Button */}
+            <button
+              type="button"
+              onClick={handleToggleCamera}
+              disabled={!videoTrack || !isVideoEnabled}
+              title={isVideoEnabled ? "Turn Camera Off" : "Guest's Camera is Off"}
+              className={`
+                flex h-[24px] w-[24px] items-center justify-center rounded-full border transition-all
+                ${
+                  !videoTrack
+                    ? "border-gray-100 text-gray-300 cursor-not-allowed bg-gray-50"
+                    : isVideoEnabled
+                    ? "border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+                    : "border-red-100 bg-red-50 text-red-400 cursor-not-allowed"
+                }
+              `}
+            >
+              {isVideoEnabled ? (
+                <IoVideocamOutline className="text-[14px]" />
+              ) : (
+                <IoVideocamOffOutline className="text-[14px]" />
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* Invite or Remove Button */}
+        {isCohost ? (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="
+              flex items-center justify-center
+              rounded-[7px]
+              bg-red-500
+              px-[10px]
+              py-[6px]
+              text-[9px]
+              font-semibold
+              text-white
+              transition-all
+              hover:bg-red-600
+              active:scale-95
+            "
+          >
+            Remove
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={isInvited}
+            onClick={onInvite}
+            className={`
+              flex items-center justify-center gap-1
+              rounded-[7px]
+              px-[10px]
+              py-[6px]
+              text-[9px]
+              font-semibold
+              transition-all
+              ${
+                isInvited
+                  ? "cursor-not-allowed bg-[#eeeeee] text-[#999]"
+                  : "bg-[#08acd1] text-white hover:bg-[#0799bb] active:scale-95"
+              }
+            `}
+          >
+            {isInvited ? (
+              <>
+                <IoCheckmark className="text-[11px]" />
+                Invited
+              </>
+            ) : (
+              <>
+                <IoPersonAdd className="text-[10px]" />
+                Invite
+              </>
+            )}
+          </button>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function CohostModal({
@@ -52,6 +306,28 @@ export default function CohostModal({
       : Array.isArray(participantsData?.participants)
       ? participantsData.participants.filter((p) => p.role !== "host")
       : [];
+
+  // Merge viewers from API with the socket-level cohosts
+  // to ensure cohosts are always displayed even if query is loading or cached.
+  const mergedList = [...viewersList];
+  cohosts.forEach((cohost) => {
+    const exists = mergedList.some((item) => {
+      const uId = item.user?._id || item._id;
+      return uId === cohost.userId;
+    });
+    if (!exists) {
+      mergedList.push({
+        _id: cohost.userId,
+        role: "cohost",
+        status: "active",
+        user: {
+          _id: cohost.userId,
+          name: cohost.username,
+          avatar: cohost.avatar,
+        },
+      } as any);
+    }
+  });
 
   const handleInviteUser = async (userId: string, userName: string) => {
     try {
@@ -180,113 +456,19 @@ export default function CohostModal({
           </p>
         </div>
 
-        {/* Active Co-hosts (Guests) */}
-        {cohosts.length > 0 && (
-          <div className="px-3 pb-2 pt-1 border-b border-[#eeeeee]">
-            <p className="text-[9px] font-medium text-[#9a9a9a] mb-1.5">
-              Active Guests
-            </p>
-            <div className="flex flex-col gap-[6px] max-h-[140px] overflow-y-auto mb-2 pr-0.5">
-              {cohosts.map((cohost) => {
-                const avatar = cohost.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80";
-                return (
-                  <div
-                    key={cohost.userId}
-                    className="
-                      flex items-center justify-between
-                      rounded-[12px]
-                      border border-cyan-100
-                      bg-cyan-50/20
-                      px-3 py-[8px]
-                      shadow-[0_1px_3px_rgba(0,0,0,0.02)]
-                    "
-                  >
-                    <div className="flex min-w-0 items-center gap-[9px]">
-                      <div className="relative shrink-0">
-                        <img
-                          src={avatar}
-                          alt={cohost.username}
-                          className="
-                            h-[32px] w-[32px]
-                            rounded-full
-                            border border-cyan-200
-                            object-cover
-                          "
-                        />
-                        <span
-                          className="
-                            absolute bottom-[-1px] right-[-1px]
-                            h-[7px] w-[7px]
-                            rounded-full
-                            border-[1.5px] border-white
-                            bg-[#21c96b]
-                          "
-                        />
-                      </div>
-                      <span
-                        className="
-                          truncate
-                          text-[10px]
-                          font-semibold
-                          text-[#242424]
-                        "
-                      >
-                        {cohost.username}
-                      </span>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        try {
-                          console.log(`[HMS ROLE] Host removing cohost: ${cohost.username} (userId: ${cohost.userId})`);
-                          const res = await liveSocketService.kickCohost(liveId, cohost.userId);
-                          if (res.success) {
-                            toast.success(`Removed guest ${cohost.username}.`);
-                            onUpdateCohosts(cohosts.filter((c) => c.userId !== cohost.userId));
-                          } else {
-                            toast.error(res.message || "Failed to remove guest.");
-                          }
-                        } catch (err: any) {
-                          toast.error(err?.message || "Failed to remove guest.");
-                        }
-                      }}
-                      className="
-                        flex shrink-0 items-center justify-center
-                        rounded-[7px]
-                        bg-red-500
-                        px-[10px]
-                        py-[6px]
-                        text-[9px]
-                        font-semibold
-                        text-white
-                        transition-all
-                        hover:bg-red-600
-                        active:scale-95
-                      "
-                    >
-                      Remove
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Participants */}
+        {/* Participants (Unified List) */}
         <div className="px-3 pb-2 pt-2">
           {isLoading ? (
             <div className="py-8 text-center text-[10px] text-[#999]">
               Loading viewers...
             </div>
-          ) : viewersList.length === 0 ? (
+          ) : mergedList.length === 0 ? (
             <div className="py-8 text-center text-[10px] text-[#999]">
               No viewers currently watching this stream.
             </div>
           ) : (
             <div className="flex max-h-[310px] flex-col gap-[6px] overflow-y-auto pr-0.5">
-              {viewersList.map((item, idx) => {
+              {mergedList.map((item, idx) => {
                 const uId =
                   item.user?._id || item._id || `user-${idx}`;
 
@@ -296,93 +478,40 @@ export default function CohostModal({
                   item.user?.avatar ||
                   "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80";
 
+                const isCohost = cohosts.some((c) => c.userId === uId);
                 const isInvited =
-                  invitedUserIds.has(uId) ||
-                  cohosts.some((c) => c.userId === uId);
+                  invitedUserIds.has(uId) || isCohost;
 
                 return (
-                  <div
+                  <ParticipantRow
                     key={uId}
-                    className="
-                      flex items-center justify-between
-                      rounded-[12px]
-                      border border-[#eeeeee]
-                      bg-white
-                      px-3 py-[8px]
-                      shadow-[0_1px_3px_rgba(0,0,0,0.03)]
-                    "
-                  >
-                    {/* User */}
-                    <div className="flex min-w-0 items-center gap-[9px]">
-                      <div className="relative shrink-0">
-                        <img
-                          src={uAvatar}
-                          alt={uName}
-                          className="
-                            h-[32px] w-[32px]
-                            rounded-full
-                            border border-[#eeeeee]
-                            object-cover
-                          "
-                        />
-
-                        {/* Online dot */}
-                        <span
-                          className="
-                            absolute bottom-[-1px] right-[-1px]
-                            h-[7px] w-[7px]
-                            rounded-full
-                            border-[1.5px] border-white
-                            bg-[#21c96b]
-                          "
-                        />
-                      </div>
-
-                      <span
-                        className="
-                          truncate
-                          text-[10px]
-                          font-semibold
-                          text-[#242424]
-                        "
-                      >
-                        {uName}
-                      </span>
-                    </div>
-
-                    {/* Invite */}
-                    <button
-                      type="button"
-                      disabled={isInvited}
-                      onClick={() => handleInviteUser(uId, uName)}
-                      className={`
-                        flex shrink-0 items-center justify-center gap-1
-                        rounded-[7px]
-                        px-[10px]
-                        py-[6px]
-                        text-[9px]
-                        font-semibold
-                        transition-all
-                        ${
-                          isInvited
-                            ? "cursor-not-allowed bg-[#eeeeee] text-[#999]"
-                            : "bg-[#08acd1] text-white hover:bg-[#0799bb] active:scale-95"
+                    uId={uId}
+                    uName={uName}
+                    uAvatar={uAvatar}
+                    isCohost={isCohost}
+                    isInvited={isInvited}
+                    liveId={liveId}
+                    onInvite={() => handleInviteUser(uId, uName)}
+                    onRemove={async () => {
+                      try {
+                        console.log(`[HMS ROLE] Host removing cohost: ${uName} (userId: ${uId})`);
+                        const res = await liveSocketService.kickCohost(liveId, uId);
+                        if (res.success) {
+                          toast.success(`Removed guest ${uName}.`);
+                          onUpdateCohosts(cohosts.filter((c) => c.userId !== uId));
+                          setInvitedUserIds((prev) => {
+                            const next = new Set(prev);
+                            next.delete(uId);
+                            return next;
+                          });
+                        } else {
+                          toast.error(res.message || "Failed to remove guest.");
                         }
-                      `}
-                    >
-                      {isInvited ? (
-                        <>
-                          <IoCheckmark className="text-[11px]" />
-                          Invited
-                        </>
-                      ) : (
-                        <>
-                          <IoPersonAdd className="text-[10px]" />
-                          Invite
-                        </>
-                      )}
-                    </button>
-                  </div>
+                      } catch (err: any) {
+                        toast.error(err?.message || "Failed to remove guest.");
+                      }
+                    }}
+                  />
                 );
               })}
             </div>
