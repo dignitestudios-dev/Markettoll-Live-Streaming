@@ -539,6 +539,82 @@ export default function LiveStreamPageView() {
     }
   }, [hmsPeers, pendingPromotions, amIHost, isHMSConnected, hmsActions]);
 
+  // Keep track of cohost connection statuses in the 100ms room
+  const cohostStatusRef = useRef<{
+    [userId: string]: {
+      addedAt: number;
+      hasJoined100ms: boolean;
+      lastSeenIn100ms: number;
+    };
+  }>({});
+
+  // Sync cohosts list with local status tracking ref
+  useEffect(() => {
+    const now = Date.now();
+    const currentStatus = cohostStatusRef.current;
+
+    cohosts.forEach((c) => {
+      if (!currentStatus[c.userId]) {
+        currentStatus[c.userId] = {
+          addedAt: now,
+          hasJoined100ms: false,
+          lastSeenIn100ms: now,
+        };
+      }
+    });
+
+    Object.keys(currentStatus).forEach((userId) => {
+      if (!cohosts.some((c) => c.userId === userId)) {
+        delete currentStatus[userId];
+      }
+    });
+  }, [cohosts]);
+
+  // Host-only effect to cleanup stale or disconnected cohosts
+  useEffect(() => {
+    if (!amIHost) return;
+
+    const timer = setInterval(() => {
+      const currentStatus = cohostStatusRef.current;
+      const now = Date.now();
+
+      cohosts.forEach((cohost) => {
+        const status = currentStatus[cohost.userId];
+        if (!status) return;
+
+        const isPresentIn100ms = hmsPeers.some((p) => p.customerUserId === cohost.userId);
+
+        if (isPresentIn100ms) {
+          status.hasJoined100ms = true;
+          status.lastSeenIn100ms = now;
+        } else {
+          // If they have never joined 100ms, wait 15s to allow them to connect.
+          // If they did join but are now gone, wait 5s grace period before kicking.
+          const gracePeriod = status.hasJoined100ms ? 5000 : 15000;
+          const timeSinceLastSeen = now - (status.hasJoined100ms ? status.lastSeenIn100ms : status.addedAt);
+
+          if (timeSinceLastSeen > gracePeriod) {
+            console.log(
+              `[Host Cleanup] Auto-removing cohost ${cohost.username} (${cohost.userId}). Reason: ${
+                status.hasJoined100ms ? "Left 100ms room" : "Failed to join 100ms room within timeout"
+              }`
+            );
+
+            liveSocketService.kickCohost(liveId, cohost.userId).then((res) => {
+              if (res.success) {
+                setCohosts((prev) => prev.filter((c) => c.userId !== cohost.userId));
+              }
+            }).catch((err) => {
+              console.warn("Failed to auto-cleanup cohost:", err);
+            });
+          }
+        }
+      });
+    }, 2000);
+
+    return () => clearInterval(timer);
+  }, [hmsPeers, cohosts, amIHost, liveId]);
+
   // Observer for local peer role change inside the 100ms room
   useEffect(() => {
     if (!localPeer?.roleName) return;
