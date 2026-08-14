@@ -26,7 +26,9 @@ export function proxy(request: NextRequest) {
 
   // If route is protected and user is not logged in, redirect to login page
   if (isProtected && !token) {
-    return NextResponse.redirect(new URL(AUTH_REDIRECT, request.url));
+    const redirectUrl = new URL(AUTH_REDIRECT, request.url);
+    redirectUrl.searchParams.set("redirect", pathname);
+    return NextResponse.redirect(redirectUrl);
   }
 
   return NextResponse.next();

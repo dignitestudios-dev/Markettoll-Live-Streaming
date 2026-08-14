@@ -76,7 +76,9 @@ export function useLogin() {
           }
 
           // Redirect
-          const targetPath = parsedUser.role === "client" ? "/" : "/dashboard";
+          const urlParams = new URLSearchParams(window.location.search);
+          const redirectParam = urlParams.get("redirect");
+          const targetPath = redirectParam || (parsedUser.role === "client" ? "/" : "/dashboard");
           router.push(targetPath);
         } else {
           const msg = "Invalid or incomplete user object in SSO token";
@@ -102,7 +104,9 @@ export function useLogin() {
     const token = Cookies.get("auth-token") || (typeof window !== "undefined" ? localStorage.getItem("auth-token") : "");
     if (token) {
       const timer = setTimeout(() => {
-        router.replace("/");
+        const urlParams = new URLSearchParams(window.location.search);
+        const redirectParam = urlParams.get("redirect");
+        router.replace(redirectParam || "/");
       }, 0);
       return () => clearTimeout(timer);
     }
@@ -152,7 +156,9 @@ export function useLogin() {
         }
 
         // 4. Instant navigation
-        const targetPath = userData?.role === "client" ? "/" : "/dashboard";
+        const urlParams = new URLSearchParams(window.location.search);
+        const redirectParam = urlParams.get("redirect");
+        const targetPath = redirectParam || (userData?.role === "client" ? "/" : "/dashboard");
         router.push(targetPath);
       } else {
         const msg = response?.message || "Login failed";

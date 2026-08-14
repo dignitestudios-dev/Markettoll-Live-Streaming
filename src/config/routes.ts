@@ -19,7 +19,15 @@ export const PUBLIC_ROUTES = ["/", "/auth/login", "/auth/register"];
 
 export const AUTH_ROUTES = ["/auth/login", "/auth/register", "/login"];
 
-export const PROTECTED_ROUTES = ["/dashboard", "/account", "/settings"];
+export const PROTECTED_ROUTES = [
+  "/dashboard",
+  "/account",
+  "/settings",
+  "/live-stream",
+  "/create-live-stream",
+  "/pre-live-setup",
+  "/pre-stream-setup",
+];
 
 // Where unauthenticated users are redirected when they hit a protected route
 export const AUTH_REDIRECT = "/auth/login";
