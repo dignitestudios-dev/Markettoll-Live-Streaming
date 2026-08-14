@@ -20,16 +20,16 @@ export default function SettingsSidebar() {
         Notifications
       </Link>
 
-      <Link
+      {/* <Link
         href="/settings/payment"
         className={`text-lg font-semibold px-5 border-b border-gray-200 py-3.5 w-full transition-colors ${
           pathname === "/settings/payment" ? "bg-gray-100 text-[#0098EA]" : "text-gray-800 hover:bg-gray-50"
         }`}
       >
         Payment
-      </Link>
+      </Link> */}
 
-      <Link
+      {/* <Link
         href="/settings/addresses"
         className={`text-lg font-semibold px-5 border-b border-gray-200 py-3.5 w-full transition-colors ${
           pathname.startsWith("/settings/addresses") || pathname.startsWith("/settings/edit-home-adress")
@@ -38,7 +38,7 @@ export default function SettingsSidebar() {
         }`}
       >
         Address
-      </Link>
+      </Link> */}
 
       <Link
         href="/settings/change-password"
@@ -49,14 +49,14 @@ export default function SettingsSidebar() {
         Change Password
       </Link>
 
-      <Link
+      {/* <Link
         href="/settings/deactivate-listing"
         className={`text-lg font-semibold px-5 border-b border-gray-200 py-3.5 w-full transition-colors ${
           pathname === "/settings/deactivate-listing" ? "bg-gray-100 text-[#0098EA]" : "text-gray-800 hover:bg-gray-50"
         }`}
       >
         Deactivate Listing
-      </Link>
+      </Link> */}
 
       <Link
         href="/settings/terms-and-conditions"
@@ -76,14 +76,14 @@ export default function SettingsSidebar() {
         Privacy Policy
       </Link>
 
-      <Link
+      {/* <Link
         href="/settings/support-request"
         className={`text-lg font-semibold px-5 border-b border-gray-200 py-3.5 w-full transition-colors ${
           pathname.startsWith("/settings/support-request") ? "bg-gray-100 text-[#0098EA]" : "text-gray-800 hover:bg-gray-50"
         }`}
       >
         Support Request
-      </Link>
+      </Link> */}
 
       <Link
         href="/settings/delete-account"

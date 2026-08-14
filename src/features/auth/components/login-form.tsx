@@ -144,11 +144,11 @@ export default function LoginForm() {
           </a>
         </div>
 
-        <p className="text-center text-xs text-[#8B8B8B] mx-auto mt-2.5 font-medium">
+        {/* <p className="text-center text-xs text-[#8B8B8B] mx-auto mt-2.5 font-medium">
           OR
         </p>
 
-        <SocialLogin />
+        <SocialLogin /> */}
 
       
       </form>
