@@ -422,7 +422,8 @@ export default function LiveStreamPageView() {
 
     const handleCohostRemoved = (data: any) => {
       console.log("live:cohost-removed", data);
-      const userId = data?.data?.userId;
+      const resData = data?.data || data;
+      const userId = typeof resData === "string" ? resData : resData?.userId || resData?.user?._id || resData?._id;
       if (userId) {
         setCohosts((prev) => prev.filter((c) => c.userId !== userId));
         toast.info("A co-host was removed from the stream.");
@@ -641,9 +642,13 @@ export default function LiveStreamPageView() {
 
   const handleLeaveStream = async () => {
     try {
-      if (isCohost && localPeer?.customerUserId) {
+      const currentUserId =
+        user?._id ||
+        (user?.id ? String(user.id) : undefined) ||
+        localPeer?.customerUserId;
+      if (isCohost && currentUserId) {
         try {
-          await liveSocketService.kickCohost(liveId, localPeer.customerUserId);
+          await liveSocketService.kickCohost(liveId, currentUserId);
         } catch (err) {
           console.warn("Failed to remove co-host state on leave:", err);
         }
