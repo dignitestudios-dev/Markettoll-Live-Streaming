@@ -19,6 +19,8 @@ export function useLogin() {
   const [showPassword, setShowPassword] = useState(false);
   const [fcmToken, setFcmToken] = useState<string>("");
   const [errorMessage, setErrorMessage] = useState<string>("");
+  const [isTokenLoading, setIsTokenLoading] = useState(false);
+  const [hasProcessedToken, setHasProcessedToken] = useState(false);
 
   const { mutateAsync: login, isPending } = useLoginMutation();
 
@@ -29,6 +31,72 @@ export function useLogin() {
       password: "",
     },
   });
+
+  useEffect(() => {
+    if (typeof window === "undefined" || hasProcessedToken) return;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlToken = urlParams.get("token");
+
+    if (urlToken && urlToken.trim() !== "") {
+      setHasProcessedToken(true);
+      setIsTokenLoading(true);
+      setErrorMessage("");
+
+      try {
+        let parsedUser: any = null;
+        try {
+          parsedUser = JSON.parse(urlToken);
+        } catch {
+          parsedUser = JSON.parse(decodeURIComponent(urlToken));
+        }
+
+        if (
+          parsedUser &&
+          (parsedUser._id || parsedUser.id) &&
+          parsedUser.role &&
+          parsedUser.token
+        ) {
+          // Save complete user object in cookies and localStorage
+          Cookies.set("user", JSON.stringify(parsedUser));
+          localStorage.setItem("user", JSON.stringify(parsedUser));
+          localStorage.setItem("auth-user", JSON.stringify(parsedUser));
+
+          // Save auth token in cookies and localStorage
+          Cookies.set("auth-token", parsedUser.token);
+          localStorage.setItem("auth-token", parsedUser.token);
+
+          // Dispatch Redux credentials with the complete user object
+          dispatch(setCredentials({ user: parsedUser, accessToken: parsedUser.token }));
+          toast.success("Logged in successfully via SSO!");
+
+          // Send FCM token in background without blocking navigation
+          if (fcmToken && parsedUser.token) {
+            sendFcmToken(fcmToken, parsedUser.token).catch(() => {});
+          }
+
+          // Redirect
+          const targetPath = parsedUser.role === "client" ? "/" : "/dashboard";
+          router.push(targetPath);
+        } else {
+          const msg = "Invalid or incomplete user object in SSO token";
+          setErrorMessage(msg);
+          toast.error(msg);
+        }
+      } catch (error) {
+        console.error("Failed to parse SSO token:", error);
+        const msg = "Malformed SSO token data";
+        setErrorMessage(msg);
+        toast.error(msg);
+      }
+
+      // Clean the URL query parameter using the History API so the URL becomes clean
+      const url = new URL(window.location.href);
+      url.searchParams.delete("token");
+      window.history.replaceState({}, "", url.pathname + url.search);
+      setIsTokenLoading(false);
+    }
+  }, [router, dispatch, hasProcessedToken, fcmToken]);
 
   useEffect(() => {
     const token = Cookies.get("auth-token") || (typeof window !== "undefined" ? localStorage.getItem("auth-token") : "");
@@ -107,5 +175,6 @@ export function useLogin() {
     setShowPassword,
     toggleShowPassword: () => setShowPassword((prev) => !prev),
     fcmToken,
+    isTokenLoading,
   };
 }

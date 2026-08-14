@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Markettoll",
+  title: "MARKET TOLL - LIVE STREAMING",
   description: "Where every need finds its perfect match",
 };
 

@@ -16,7 +16,18 @@ export const createLiveStreamSchema = z.object({
     .any()
     .refine((val) => val !== null && val !== undefined && val !== "", {
       message: "Please upload a thumbnail image for your live stream",
-    }),
+    })
+    .refine(
+      (val) => {
+        if (val instanceof File) {
+          return val.size <= 5 * 1024 * 1024; // 5MB limit
+        }
+        return true;
+      },
+      {
+        message: "Thumbnail image size must be 5MB or less",
+      }
+    ),
   selectedProductIds: z.array(z.string()),
 });
 

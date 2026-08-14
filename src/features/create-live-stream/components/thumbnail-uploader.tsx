@@ -2,6 +2,7 @@
 
 import React, { useRef, useState } from "react";
 import { LuCamera, LuX, LuUpload } from "react-icons/lu";
+import { toast } from "react-toastify";
 
 interface ThumbnailUploaderProps {
   value: File | string | null;
@@ -27,6 +28,13 @@ export default function ThumbnailUploader({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("Image size must be 5MB or less");
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+        return;
+      }
       onChange(file);
     }
   };
@@ -48,6 +56,10 @@ export default function ThumbnailUploader({
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
       if (file.type.startsWith("image/")) {
+        if (file.size > 5 * 1024 * 1024) {
+          toast.error("Image size must be 5MB or less");
+          return;
+        }
         onChange(file);
       }
     }

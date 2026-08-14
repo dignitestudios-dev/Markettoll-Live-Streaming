@@ -15,12 +15,24 @@ export default function LoginForm() {
     errorMessage,
     showPassword,
     toggleShowPassword,
+    isTokenLoading,
   } = useLogin();
 
   const {
     register,
     formState: { errors },
   } = form;
+
+  if (isTokenLoading) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-8 bg-white min-h-[calc(100vh-160px)]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-12 h-12 border-4 border-[#1E88E5] border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm font-medium text-gray-600">Authenticating via SSO token...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     

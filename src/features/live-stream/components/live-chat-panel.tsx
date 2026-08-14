@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { IoPaperPlane } from "react-icons/io5";
+import { IoPaperPlane, IoChatbubblesOutline } from "react-icons/io5";
 import { useAuth } from "@/hooks/use-auth";
 import { liveSocketService } from "../services/live-socket.service";
 
@@ -154,26 +154,40 @@ export default function LiveChatPanel({
     <div className="w-full lg:w-[320px] xl:w-[360px] h-[520px] lg:h-full max-h-[600px] bg-[#0E1420] border-l border-white/10 flex flex-col justify-between p-4 shadow-2xl select-none overflow-hidden">
       {/* Messages Scroll Area */}
       <div className="flex-1 min-h-0 overflow-y-auto py-2 flex flex-col gap-3 pr-1.5 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
-        {messages.map((msg) => (
-          <div key={msg.id} className="flex items-start gap-2.5 text-xs text-white">
-            <img
-              src={
-                msg.avatar ||
-                "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80"
-              }
-              alt={msg.username}
-              className="w-7 h-7 rounded-full object-cover shrink-0 border border-white/20 mt-0.5"
-            />
-            <div className="flex-1 min-w-0">
-              <span className="font-bold text-[#0098EA] text-[12px] block truncate">
-                {msg.username}
-              </span>
-              <p className="text-gray-200 text-xs leading-relaxed break-words mt-0.5">
-                {msg.message}
-              </p>
+        {messages.length === 0 ? (
+          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center h-full select-none my-auto">
+            <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-[#0098EA]/10 to-[#003DAC]/20 flex items-center justify-center mb-3.5 border border-white/5 shadow-inner">
+              <IoChatbubblesOutline className="text-2xl text-[#0098EA] animate-pulse" />
             </div>
+            <h3 className="text-white font-semibold text-sm mb-1 tracking-wide">
+              No Messages Yet
+            </h3>
+            <p className="text-gray-400 text-[11px] max-w-[200px] leading-relaxed font-light">
+              Welcome to the live chat! Be the first to send a message.
+            </p>
           </div>
-        ))}
+        ) : (
+          messages.map((msg) => (
+            <div key={msg.id} className="flex items-start gap-2.5 text-xs text-white">
+              <img
+                src={
+                  msg.avatar ||
+                  "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80"
+                }
+                alt={msg.username}
+                className="w-7 h-7 rounded-full object-cover shrink-0 border border-white/20 mt-0.5"
+              />
+              <div className="flex-1 min-w-0">
+                <span className="font-bold text-[#0098EA] text-[12px] block truncate">
+                  {msg.username}
+                </span>
+                <p className="text-gray-200 text-xs leading-relaxed break-words mt-0.5">
+                  {msg.message}
+                </p>
+              </div>
+            </div>
+          ))
+        )}
         <div ref={messagesEndRef} />
       </div>
 

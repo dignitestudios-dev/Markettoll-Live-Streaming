@@ -292,6 +292,42 @@ export default function CohostModal({
     new Set()
   );
 
+  React.useEffect(() => {
+    const socket = liveSocketService.connect();
+
+    const handleCohostRejected = (data: any) => {
+      console.log("CohostModal: live:cohost-rejected", data);
+      const userId = data?.data?.userId;
+      if (userId) {
+        setInvitedUserIds((prev) => {
+          const next = new Set(prev);
+          next.delete(userId);
+          return next;
+        });
+      }
+    };
+
+    const handleCohostRemoved = (data: any) => {
+      console.log("CohostModal: live:cohost-removed", data);
+      const userId = data?.data?.userId;
+      if (userId) {
+        setInvitedUserIds((prev) => {
+          const next = new Set(prev);
+          next.delete(userId);
+          return next;
+        });
+      }
+    };
+
+    socket.on("live:cohost-rejected", handleCohostRejected);
+    socket.on("live:cohost-removed", handleCohostRemoved);
+
+    return () => {
+      socket.off("live:cohost-rejected", handleCohostRejected);
+      socket.off("live:cohost-removed", handleCohostRemoved);
+    };
+  }, []);
+
   const { data: participantsData, isLoading } = useLiveParticipantsQuery(
     liveId,
     isOpen
@@ -376,98 +412,106 @@ export default function CohostModal({
   const openSlots = Math.max(0, 5 - cohostCount);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
       <div
         className="
-          w-full max-w-[360px]
-          rounded-[22px]
+          w-full max-w-[420px]
+          rounded-[28px]
           bg-white
           text-[#171717]
-          shadow-[0_20px_60px_rgba(0,0,0,0.35)]
+          shadow-[0_25px_80px_rgba(0,0,0,0.45)]
+          ring-1 ring-black/5
           overflow-hidden
         "
       >
         {/* Header */}
-        <div className="px-4 pt-4">
+        <div className="relative bg-gradient-to-b from-[#f3fbfd] to-white px-6 pt-6 pb-5">
           <div className="flex items-center justify-between">
-            <h3 className="text-[15px] font-bold text-[#171717]">
+            <h3 className="text-[20px] font-extrabold tracking-tight text-[#101010]">
               Invite Guests
             </h3>
 
             <button
               type="button"
               onClick={onClose}
+              aria-label="Close"
               className="
-                flex h-[22px] w-[22px]
+                flex h-[30px] w-[30px]
                 items-center justify-center
                 rounded-full
-                bg-[#8d8d8d]
-                text-white
+                bg-[#efefef]
+                text-[#4b4b4b]
                 transition
-                hover:bg-[#707070]
+                hover:bg-[#e2e2e2]
+                active:scale-95
               "
             >
-              <IoClose className="text-[14px]" />
+              <IoClose className="text-[17px]" />
             </button>
           </div>
 
           {/* Guest slots */}
-          <div className="mt-2 flex items-center gap-[5px]">
-            {Array.from({ length: 5 }).map((_, index) => {
-              const filled = index < cohostCount;
+          <div className="mt-4 flex items-center gap-2">
+            <div className="flex items-center -space-x-1.5">
+              {Array.from({ length: 5 }).map((_, index) => {
+                const filled = index < cohostCount;
 
-              return (
-                <div
-                  key={index}
-                  className={`
-                    flex h-[20px] w-[20px]
-                    items-center justify-center
-                    rounded-full
-                    border
-                    ${
-                      filled
-                        ? "border-[#08add0] bg-[#08add0]"
-                        : "border-[#a8a8a8] bg-white"
-                    }
-                  `}
-                >
-                  {filled ? (
-                    <span className="h-full w-full rounded-full bg-[#08add0]" />
-                  ) : (
-                    <span className="text-[14px] leading-none text-[#777]">
-                      +
-                    </span>
-                  )}
-                </div>
-              );
-            })}
+                return (
+                  <div
+                    key={index}
+                    className={`
+                      flex h-[28px] w-[28px]
+                      items-center justify-center
+                      rounded-full
+                      border-2
+                      ring-2 ring-white
+                      transition-all
+                      ${
+                        filled
+                          ? "border-[#08add0] bg-gradient-to-br from-[#0ecbef] to-[#0891b0] shadow-[0_2px_6px_rgba(8,173,208,0.45)]"
+                          : "border-dashed border-[#c6c6c6] bg-[#fafafa]"
+                      }
+                    `}
+                  >
+                    {!filled && (
+                      <span className="text-[15px] leading-none text-[#b0b0b0]">
+                        +
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
 
-            <span className="ml-1 text-[8px] font-medium text-[#888]">
-              {cohostCount}/5 guests -
-            </span>
-
-            <span className="text-[8px] font-semibold text-[#08a9cf]">
-              {openSlots} slots open
-            </span>
+            <div className="ml-2 flex flex-col leading-tight">
+              <span className="text-[12px] font-semibold text-[#3a3a3a]">
+                {cohostCount}/5 guests
+              </span>
+              <span className="text-[11px] font-medium text-[#08a9cf]">
+                {openSlots} {openSlots === 1 ? "slot" : "slots"} open
+              </span>
+            </div>
           </div>
 
-          <p className="mt-3 text-[9px] font-medium text-[#9a9a9a]">
+          <p className="mt-4 text-[12px] font-medium text-[#9a9a9a]">
             Followers currently watching this stream
           </p>
         </div>
 
+        <div className="h-px w-full bg-[#f0f0f0]" />
+
         {/* Participants (Unified List) */}
-        <div className="px-3 pb-2 pt-2">
+        <div className="px-4 pb-3 pt-4">
           {isLoading ? (
-            <div className="py-8 text-center text-[10px] text-[#999]">
+            <div className="py-12 text-center text-[13px] text-[#999]">
               Loading viewers...
             </div>
           ) : mergedList.length === 0 ? (
-            <div className="py-8 text-center text-[10px] text-[#999]">
+            <div className="py-12 text-center text-[13px] text-[#999]">
               No viewers currently watching this stream.
             </div>
           ) : (
-            <div className="flex max-h-[310px] flex-col gap-[6px] overflow-y-auto pr-0.5">
+            <div className="flex max-h-[360px] flex-col gap-2 overflow-y-auto pr-1">
               {mergedList.map((item, idx) => {
                 const uId =
                   item.user?._id || item._id || `user-${idx}`;
@@ -519,26 +563,27 @@ export default function CohostModal({
         </div>
 
         {/* Footer */}
-        <div className="px-3 pb-3 pt-1">
+        <div className="px-4 pb-5 pt-2">
           <button
             type="button"
             onClick={handleCopyInviteLink}
             className="
               flex w-full
-              items-center justify-center gap-2
-              rounded-[10px]
-              bg-[#08acd1]
-              py-[11px]
-              text-[10px]
+              items-center justify-center gap-2.5
+              rounded-[14px]
+              bg-gradient-to-r from-[#0ecbef] to-[#08acd1]
+              py-[14px]
+              text-[13px]
               font-bold
+              tracking-wide
               text-white
-              shadow-[0_3px_8px_rgba(8,172,209,0.22)]
+              shadow-[0_6px_16px_rgba(8,172,209,0.35)]
               transition-all
-              hover:bg-[#0799bb]
-              active:scale-[0.99]
+              hover:brightness-105 hover:shadow-[0_8px_20px_rgba(8,172,209,0.45)]
+              active:scale-[0.98]
             "
           >
-            <IoCopyOutline className="text-[13px]" />
+            <IoCopyOutline className="text-[16px]" />
             Copy Invite Link
           </button>
         </div>

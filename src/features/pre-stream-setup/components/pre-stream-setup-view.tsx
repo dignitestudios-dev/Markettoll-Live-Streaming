@@ -79,7 +79,7 @@ export default function PreStreamSetupView() {
         return;
       }
 
-      toast.success("🔴 Live Stream Starting... Redirecting to broadcast page!");
+      // toast.success("🔴 Live Stream Starting... Redirecting to broadcast page!");
 
       const liveId =
         res.data?.live?._id ||

@@ -226,15 +226,17 @@ export default function LiveVideoGrid({
   // 2. Add co-hosts from Socket.IO state who are not yet connected via 100ms
   cohosts.forEach((c) => {
     const isAlreadyConnected = cohostPeers.some((p) => p.customerUserId === c.userId);
+    
     if (!isAlreadyConnected) {
       activeParticipants.push({
         userId: c.userId,
         username: c.username && c.username !== "Someone" ? c.username : "Co-Host",
-        avatar: c.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
+        avatar: c.avatar || "",
         videoTrack: undefined,
       });
     }
   });
+  
 
   // Retrieve local peer's HMS video track (for host/cohost)
   const localPeerVideoTrack = useHMSStore(selectVideoTrackByPeerID(localPeer?.id));
@@ -252,12 +254,12 @@ export default function LiveVideoGrid({
       className="relative w-full aspect-video sm:h-[460px] lg:h-[500px] bg-black overflow-hidden select-none group"
     >
       {/* Top Left Floating Joined Participants / Co-Hosts Cards */}
-      {activeParticipants.length > 0 && (
+      {activeParticipants?.length > 0 && (
         <div className="absolute top-4 left-4 z-20 flex items-center gap-3">
-          {activeParticipants.map((participant) => (
+          {activeParticipants?.map((participant) => (
             <div
               key={participant.userId}
-              className="relative w-14 h-18 sm:w-16 sm:h-20 rounded-2xl overflow-hidden border border-cyan-400/50 shadow-2xl group/card bg-black/60 backdrop-blur-md"
+                className="relative w-18 h-24 sm:w-28 sm:h-32 rounded-2xl overflow-hidden border border-cyan-400/50 shadow-2xl group/card bg-black/60 backdrop-blur-md"
             >
               {participant.videoTrack ? (
                 <HMSVideoElement
@@ -359,7 +361,7 @@ export default function LiveVideoGrid({
             <HMSVideoElement
               trackId={mainVideoTrackId}
               className={`w-full h-full object-contain bg-black transition-opacity duration-300 ${
-                isPublisher && isMirrored ? "-scale-x-100" : "scale-x-100"
+                isPublisher ? "-scale-x-100" : "scale-x-100"
               }`}
             />
           ) : isPublisher && !isConnected && isCameraOn && streamActive ? (
@@ -368,9 +370,7 @@ export default function LiveVideoGrid({
               autoPlay
               playsInline
               muted
-              className={`w-full h-full object-contain bg-black transition-opacity duration-300 ${
-                isMirrored ? "-scale-x-100" : "scale-x-100"
-              }`}
+              className={`w-full h-full object-contain bg-black transition-opacity duration-300 `}
             />
           ) : (
             /* Fallback Presenter Poster / Thumbnail Image when Camera is OFF or Stream is connecting */

@@ -13,6 +13,8 @@ import CohostModal, { CohostParticipant } from "./cohost-modal";
 import CohostInviteModal from "./cohost-invite-modal";
 import EndStreamModal from "./end-stream-modal";
 import ShareModal from "./share-modal";
+import ChooseDeliveryModal from "./choose-delivery-modal";
+import { useAuth } from "@/hooks/use-auth";
 import { liveSocketService } from "../services/live-socket.service";
 import { getHMSRoomToken } from "../services/hms.service";
 import { useLivesQuery } from "@/features/home/api/lives.queries";
@@ -23,6 +25,10 @@ export default function LiveStreamPageView() {
   const router = useRouter();
   const params = useParams();
   const liveId = (params?.id as string) || "live-session-101";
+
+  const { user } = useAuth();
+  const [showDeliveryModal, setShowDeliveryModal] = useState<boolean>(false);
+  const [selectedProduct, setSelectedProduct] = useState<LiveProductItem | null>(null);
 
   // Fetch lives API data
   const { data: rawLives } = useLivesQuery();
@@ -588,7 +594,6 @@ export default function LiveStreamPageView() {
         console.warn("HMS leave error:", e);
       }
       await liveSocketService.endLive(liveId);
-      toast.success("Live stream ended successfully.");
       setIsEndModalOpen(false);
       setIsLiveEnded(true);
       router.push("/");
@@ -600,14 +605,26 @@ export default function LiveStreamPageView() {
     }
   };
 
-  const handleAddToCart = async (product: LiveProductItem) => {
-    const productId = product.id;
+  const handleAddToCart = (product: LiveProductItem) => {
+    if (!user) {
+      toast.error("You must be logged in to add products to your cart.");
+      return;
+    }
+    setSelectedProduct(product);
+    setShowDeliveryModal(true);
+  };
+
+  const handleSelectFulfillment = async (method: { selfPickup: boolean; delivery: boolean }) => {
+    if (!selectedProduct) return;
+    const productId = selectedProduct.id;
     if (!productId) return;
 
     try {
       // API call: BaseUrl/users/cart-products/:id (POST)
-      const res = await axiosInstance.post(`/users/cart-products/${productId}`);
-      const successMessage = res.data?.message || `Added "${product.title}" to cart!`;
+      const res = await axiosInstance.post(`/users/cart-product/${productId}`, {
+        fulfillmentMethod: method,
+      });
+      const successMessage = res.data?.message || `Added "${selectedProduct.title}" to cart!`;
       toast.success(successMessage);
     } catch (error: any) {
       console.error("Add to cart error:", error);
@@ -616,6 +633,9 @@ export default function LiveStreamPageView() {
         error?.message ||
         "Failed to add product to cart.";
       toast.error(errorMsg);
+    } finally {
+      setShowDeliveryModal(false);
+      setSelectedProduct(null);
     }
   };
 
@@ -748,7 +768,7 @@ export default function LiveStreamPageView() {
                 hostUserId={hostUserId}
                 isMicOn={isMicOn}
                 isCameraOn={isCameraOn}
-                isMirrored={isMirrored}
+                isMirrored={true}
                 cohosts={cohosts}
                 isLiveEnded={isLiveEnded}
                 onToggleMic={async () => {
@@ -853,6 +873,12 @@ export default function LiveStreamPageView() {
           }}
         />
       )}
+
+      <ChooseDeliveryModal
+        showPopup={showDeliveryModal}
+        handleShowPopup={() => setShowDeliveryModal(false)}
+        handleSelectFulfillmentMethod={handleSelectFulfillment}
+      />
     </div>
   );
 }

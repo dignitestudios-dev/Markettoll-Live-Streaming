@@ -34,6 +34,11 @@ export default function UpdateProfileImageModal({
       return;
     }
 
+    if (image.size > 5 * 1024 * 1024) {
+      toast.error("Image size must be 5MB or less");
+      return;
+    }
+
     const token =
       accessToken ||
       Cookies.get("auth-token") ||
@@ -116,7 +121,14 @@ export default function UpdateProfileImageModal({
               )}
             </div>
             <input
-              onChange={(e) => setImage(e.target.files?.[0] || null)}
+              onChange={(e) => {
+                const file = e.target.files?.[0] || null;
+                if (file && file.size > 5 * 1024 * 1024) {
+                  toast.error("Image size must be 5MB or less");
+                  return;
+                }
+                setImage(file);
+              }}
               id="dropzone-file"
               type="file"
               accept="image/*"
