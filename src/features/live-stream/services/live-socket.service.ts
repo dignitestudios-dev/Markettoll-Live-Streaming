@@ -21,7 +21,7 @@ class LiveSocketService {
 
     // If socket exists but auth token has changed, disconnect old socket
     if (this.socket && this.currentToken !== token) {
-      console.log("🔄 Auth token changed. Reconnecting socket with new user token...");
+      console.info("🔄 Auth token changed. Reconnecting socket with new user token...");
       this.socket.disconnect();
       this.socket = null;
       this.isConnecting = false;
@@ -63,7 +63,7 @@ class LiveSocketService {
     });
 
     this.socket.on("connect", () => {
-      console.log("⚡ Live Socket Connected:", this.socket?.id);
+      console.info("⚡ Live Socket Connected:", this.socket?.id);
       this.isConnecting = false;
     });
 
@@ -73,7 +73,7 @@ class LiveSocketService {
     });
 
     this.socket.on("disconnect", (reason) => {
-      console.log("🔌 Live Socket Disconnected:", reason);
+      console.info("🔌 Live Socket Disconnected:", reason);
       this.isConnecting = false;
     });
 

@@ -33,7 +33,6 @@ export async function sendFcmToken(fcmToken: string, jwtToken?: string): Promise
       },
       headers.Authorization ? { headers } : undefined
     );
-    console.log("FCM token sent successfully:", res?.data);
     if (typeof window !== "undefined") {
       localStorage.setItem("sentFcmToken", fcmToken);
       localStorage.setItem("fcmToken", fcmToken);

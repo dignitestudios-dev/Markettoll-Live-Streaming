@@ -40,7 +40,6 @@ export default function CreateLiveStreamView() {
   const onSubmit = async (data: CreateLiveStreamSchemaType) => {
     try {
       setIsSubmitting(true);
-      console.log("Saving draft live stream data:", data);
 
       let thumbnailUrl = "";
       if (typeof data.thumbnail === "string" && data.thumbnail) {

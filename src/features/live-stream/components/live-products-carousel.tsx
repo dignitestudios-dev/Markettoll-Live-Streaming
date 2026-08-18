@@ -25,7 +25,6 @@ export default function LiveProductsCarousel({
   if (!products || products.length === 0) {
     return null;
   }
-  console.log(products,"products")
 
   return (
     <div className="w-full bg-[#111723] p-4 border-t border-white/10 select-none">

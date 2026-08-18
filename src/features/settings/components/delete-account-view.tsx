@@ -73,7 +73,7 @@ export default function DeleteAccountView() {
         toast.error("Something went wrong while deleting your account.");
       }
     } catch (error: any) {
-      console.log("error deleting account >>>", error?.response?.data);
+      console.error("error deleting account >>>", error?.response?.data);
       const msg =
         error?.response?.data?.message ||
         error?.message ||

@@ -21,7 +21,6 @@ export default function HomeView() {
 
   // Fetch lives via React Query useLivesQuery hook
   const { data: rawLives, isLoading } = useLivesQuery();
-  console.log(rawLives, "rawLive===>");
 
   const streams: LiveStream[] = useMemo(() => {
     if (Array.isArray(rawLives)) {
@@ -107,7 +106,6 @@ export default function HomeView() {
     setActiveStreamModal(null);
     router.push(`/live-stream/${liveId}`);
   };
-console.log(activeStreamModal,'activeStreamModal?.products')
   return (
     <div className="w-full padding-x py-6 bg-white min-h-screen">
       <div className="max-w-7xl mx-auto space-y-4">

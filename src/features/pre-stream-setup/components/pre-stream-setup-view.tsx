@@ -72,7 +72,6 @@ export default function PreStreamSetupView() {
           "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80",
       });
 
-      console.log("Create Live Socket Response:", res);
 
       if (!res.success) {
         toast.error(res.message || res.error || "Failed to start live stream.");
@@ -99,7 +98,6 @@ export default function PreStreamSetupView() {
         sessionStorage.setItem(`host_camera_${liveId}`, isCameraOn ? "true" : "false");
       }
 
-      console.log("Navigating to live stream with ID:", liveId);
       router.push(`/live-stream/${liveId}`);
     } catch (error: any) {
       console.error("Failed to start live stream:", error);

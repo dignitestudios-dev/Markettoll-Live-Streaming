@@ -63,7 +63,6 @@ export async function uploadThumbnailFile(file: File): Promise<string> {
       },
     });
 
-    console.log("Upload attachments API response:", response.data);
 
     // Extract attachments array from API response
     const attachments =

@@ -20,7 +20,7 @@ export async function getHMSRoomToken(
   userId: string = "user-1"
 ): Promise<string> {
   try {
-    console.log(`[100ms API] Generating HMS Token for room: ${roomId}, role: ${role}, user: ${userId}`);
+    console.debug(`[100ms API] Generating HMS Token for room: ${roomId}, role: ${role}, user: ${userId}`);
 
     // If an explicit auth token is configured in environment, use it
     if (process.env.NEXT_PUBLIC_HMS_AUTH_TOKEN) {

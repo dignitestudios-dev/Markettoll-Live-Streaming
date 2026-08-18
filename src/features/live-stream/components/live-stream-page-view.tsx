@@ -215,8 +215,6 @@ export default function LiveStreamPageView() {
           }
         }
 
-        console.log("HMS Host Init: Token =", Boolean(token));
-
         if (token && isMounted && !isHMSConnected) {
           try {
             await hmsActions.join({
@@ -259,7 +257,6 @@ export default function LiveStreamPageView() {
           try {
             const rawRes = await liveSocketService.joinLive(liveId);
             const res = Array.isArray(rawRes) ? rawRes[0] : rawRes;
-            console.log("Viewer Join Live Socket Response:", res);
 
             if (res && res.success === false) {
               const errorMsg = String(res.error || res.message || "").toLowerCase();
@@ -291,9 +288,6 @@ export default function LiveStreamPageView() {
             console.warn("Viewer socket join error:", err);
           }
         }
-
-        console.log("HMS Viewer Init: Token =", Boolean(token));
-
         if (token && isMounted && !isHMSConnected) {
           try {
             await hmsActions.join({
@@ -317,7 +311,6 @@ export default function LiveStreamPageView() {
 
     const handleViewerCountUpdated = (rawRes: any) => {
       const res = Array.isArray(rawRes) ? rawRes[0] : rawRes;
-      console.log("Viewer Count Updated Response:", res);
       const count = res?.data?.count ?? res?.count;
       if (typeof count === "number") {
         setViewerCount(count);
@@ -331,7 +324,6 @@ export default function LiveStreamPageView() {
     };
 
     const handleHostReconnected = async (data: any) => {
-      console.log("Host reconnected event:", data);
       const freshToken = data?.data?.token || data?.token;
       if (freshToken) {
         try {
@@ -348,7 +340,6 @@ export default function LiveStreamPageView() {
     };
 
     const handleReconnected = async (data: any) => {
-      console.log("Reconnected event:", data);
       const freshToken = data?.data?.token || data?.token;
       if (freshToken) {
         try {
@@ -366,8 +357,6 @@ export default function LiveStreamPageView() {
 
     // Co-host event listeners
     const handleCohostInvited = (data: any) => {
-      console.log("live:cohost-invited", data);
-      // Open accept/reject modal for the invited viewer
       setCohostInvite({
         hostUsername: data?.data?.hostUsername || "Host",
         liveId: data?.data?.liveId || liveId,
@@ -376,7 +365,6 @@ export default function LiveStreamPageView() {
     };
 
     const handleCohostAdded = (data: any) => {
-      console.log("live:cohost-added", data);
       const resData = data?.data || data;
       const username = resData?.username || resData?.user?.name || resData?.name || "Co-Host";
       toast.success(`${username} joined as co-host.`);
@@ -389,19 +377,14 @@ export default function LiveStreamPageView() {
 
         if (amIHost) {
           const peer = hmsPeersRef.current.find((p) => p.customerUserId === userId);
-          console.log(peer, "peer peer")
           if (peer) {
-            console.log(`[HMS ROLE] Host promoting accepted co-host peer immediately:`, peer.id);
             hmsActions
               .changeRoleOfPeer(peer.id, cohostRoleName, true)
-              .then(() => {
-                console.log(`[HMS ROLE] Role change successful: changed peer ${peer.name} to co-host`);
-              })
+              .then(() => {})
               .catch((err) => {
                 console.error(`[HMS ROLE] Role change failed:`, err);
               });
           } else {
-            console.log(`[HMS ROLE] Host queueing user ${userId} for co-host promotion (peer not in room yet).`);
             setPendingPromotions((prev) => {
               if (prev.includes(userId)) return prev;
               return [...prev, userId];
@@ -412,7 +395,6 @@ export default function LiveStreamPageView() {
     };
 
     const handleCohostRejected = (data: any) => {
-      console.log("live:cohost-rejected", data);
       toast.info("Co-host invitation was declined.");
       const userId = data?.data?.userId;
       if (userId) {
@@ -421,7 +403,6 @@ export default function LiveStreamPageView() {
     };
 
     const handleCohostRemoved = (data: any) => {
-      console.log("live:cohost-removed", data);
       const resData = data?.data || data;
       const userId = typeof resData === "string" ? resData : resData?.userId || resData?.user?._id || resData?._id;
       if (userId) {
@@ -431,24 +412,18 @@ export default function LiveStreamPageView() {
         if (amIHost) {
           const peer = hmsPeersRef.current.find((p) => p.customerUserId === userId);
           if (peer) {
-            console.log(`[HMS ROLE] Host removing co-host, changing role: demoting peer ${peer.name} (${peer.id}) to ${viewerRoleName}...`);
             hmsActions
               .changeRoleOfPeer(peer.id, viewerRoleName, true)
-              .then(() => {
-                console.log(`[HMS ROLE] Role change successful: changed peer ${peer.name} back to ${viewerRoleName}`);
-              })
+              .then(() => {})
               .catch((err) => {
                 console.error(`[HMS ROLE] Role change failed for peer ${peer.name}:`, err);
               });
-          } else {
-            console.log(`[HMS ROLE] Target peer to demote (userId: ${userId}) not found in HMS room.`);
           }
         }
       }
     };
 
     const handleCohostMuted = (data: any) => {
-      console.log("live:cohost-muted", data);
       const userId = data?.data?.userId;
       if (userId) {
         setCohosts((prev) =>
@@ -458,7 +433,6 @@ export default function LiveStreamPageView() {
     };
 
     const handleCohostUnmuted = (data: any) => {
-      console.log("live:cohost-unmuted", data);
       const userId = data?.data?.userId;
       if (userId) {
         setCohosts((prev) =>
@@ -503,34 +477,20 @@ export default function LiveStreamPageView() {
       // Find the peer in the room where customerUserId matches the user's ID
       const peer = hmsPeers.find((p) => p.customerUserId === userId);
       if (peer) {
-        console.log(`[HMS ROLE] Target peer found in room:`, {
-          id: peer.id,
-          name: peer.name,
-          roleName: peer.roleName,
-          customerUserId: peer.customerUserId,
-        });
-
         const normalizedRole = peer.roleName?.toLowerCase() || "";
         if (normalizedRole === "co-host" || normalizedRole === "cohost" || normalizedRole === "co_host") {
-          console.log(`[HMS ROLE] Peer ${peer.name} is already co-host.`);
           promotedUserIds.push(userId);
           return;
         }
 
-        console.log(`[HMS ROLE] Changing role: promoting peer ${peer.name} (${peer.id}) to co-host...`);
-
         hmsActions
           .changeRoleOfPeer(peer.id, cohostRoleName, true)
-          .then(() => {
-            console.log(`[HMS ROLE] Role change successful: changed peer ${peer.name} to co-host`);
-          })
+          .then(() => {})
           .catch((err) => {
             console.error(`[HMS ROLE] Role change failed for peer ${peer.name}:`, err);
           });
 
         promotedUserIds.push(userId);
-      } else {
-        console.log(`[HMS ROLE] Pending promotion user ${userId} not yet found in HMS room.`);
       }
     });
 
@@ -594,12 +554,6 @@ export default function LiveStreamPageView() {
           const timeSinceLastSeen = now - (status.hasJoined100ms ? status.lastSeenIn100ms : status.addedAt);
 
           if (timeSinceLastSeen > gracePeriod) {
-            console.log(
-              `[Host Cleanup] Auto-removing cohost ${cohost.username} (${cohost.userId}). Reason: ${
-                status.hasJoined100ms ? "Left 100ms room" : "Failed to join 100ms room within timeout"
-              }`
-            );
-
             liveSocketService.kickCohost(liveId, cohost.userId).then((res) => {
               if (res.success) {
                 setCohosts((prev) => prev.filter((c) => c.userId !== cohost.userId));
@@ -621,11 +575,8 @@ export default function LiveStreamPageView() {
 
     const currentRole = localPeer.roleName.toLowerCase();
     const isCohostRole = currentRole === "co-host" || currentRole === "cohost" || currentRole === "co_host";
-    console.log("[HMS ROLE] Current local role:", localPeer.roleName);
 
     if (isCohostRole) {
-      console.log("[100ms Role Observer] Detected transition to co-host. Enabling local media publishing...");
-      
       const enableMedia = async () => {
         try {
           setIsCohost(true);
@@ -642,8 +593,6 @@ export default function LiveStreamPageView() {
 
       enableMedia();
     } else if (currentRole === viewerRoleName.toLowerCase()) {
-      console.log("[100ms Role Observer] Detected transition to viewer. Disabling local media publishing...");
-      
       const disableMedia = async () => {
         try {
           setIsCohost(false);
@@ -933,8 +882,7 @@ export default function LiveStreamPageView() {
           invitationId={cohostInvite.invitationId}
           onAccept={async () => {
             try {
-              const res = await liveSocketService.acceptCohost(cohostInvite.liveId, localPeer?.id);
-              console.log("acceptCohost socket response:", res);
+              await liveSocketService.acceptCohost(cohostInvite.liveId, localPeer?.id);
               toast.info("Accepted co-host invitation. Connecting to stream...");
             } catch (err) {
               toast.error("Failed to accept co-host invitation.");

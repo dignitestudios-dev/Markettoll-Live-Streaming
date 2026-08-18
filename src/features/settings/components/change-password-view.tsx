@@ -131,7 +131,7 @@ export default function ChangePasswordView() {
         handleToggleModal();
       }
     } catch (error: any) {
-      console.log("change password error >>>", error?.response?.data);
+      console.error("change password error >>>", error?.response?.data);
       const msg =
         error?.response?.data?.message ||
         error?.message ||

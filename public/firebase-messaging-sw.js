@@ -18,7 +18,7 @@ if (!firebase.apps.length) {
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
-  console.log("[firebase-messaging-sw.js] Received background message:", payload);
+  console.info("[firebase-messaging-sw.js] Received background message:", payload);
   const notificationTitle = payload.notification?.title || "New Notification";
   const notificationOptions = {
     body: payload.notification?.body || "",

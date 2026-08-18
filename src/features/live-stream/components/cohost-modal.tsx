@@ -73,10 +73,7 @@ function ParticipantRow({
   const isMicEnabled = audioTrack ? audioTrack.enabled : true;
   const isVideoEnabled = videoTrack ? videoTrack.enabled : true;
 
-  console.log("audioTrack", audioTrack);
-  console.log("videoTrack", videoTrack);
   const handleToggleMute = async () => {
-    console.log(audioTrack,"audioTrack")
     if (audioTrack) {
       if (!audioTrack.enabled) {
         toast.info("Only the co-host can unmute themselves.");
@@ -296,7 +293,6 @@ export default function CohostModal({
     const socket = liveSocketService.connect();
 
     const handleCohostRejected = (data: any) => {
-      console.log("CohostModal: live:cohost-rejected", data);
       const userId = data?.data?.userId;
       if (userId) {
         setInvitedUserIds((prev) => {
@@ -308,7 +304,6 @@ export default function CohostModal({
     };
 
     const handleCohostRemoved = (data: any) => {
-      console.log("CohostModal: live:cohost-removed", data);
       const userId = data?.data?.userId;
       if (userId) {
         setInvitedUserIds((prev) => {
@@ -538,7 +533,6 @@ export default function CohostModal({
                     onInvite={() => handleInviteUser(uId, uName)}
                     onRemove={async () => {
                       try {
-                        console.log(`[HMS ROLE] Host removing cohost: ${uName} (userId: ${uId})`);
                         const res = await liveSocketService.kickCohost(liveId, uId);
                         if (res.success) {
                           toast.success(`Removed guest ${uName}.`);

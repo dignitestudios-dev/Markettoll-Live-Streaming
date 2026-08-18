@@ -121,7 +121,7 @@ export function useLogin() {
           setFcmToken(token);
         }
       } catch (err) {
-        console.log("Error getting FCM token:", err);
+        console.error("Error getting FCM token:", err);
       }
     }
     getFcm();

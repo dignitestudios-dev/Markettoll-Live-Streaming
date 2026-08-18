@@ -63,7 +63,7 @@ export default function UpdatePhoneNumberModal({
         handleOtpModal();
       }
     } catch (error: any) {
-      console.log("update phone number error >>>>", error);
+      console.error("update phone number error >>>>", error);
       toast.error(error?.response?.data?.message || "Failed to update phone number");
       onclick();
     } finally {
