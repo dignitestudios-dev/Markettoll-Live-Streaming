@@ -26,8 +26,9 @@ export default function HomeView() {
     if (Array.isArray(rawLives)) {
       return rawLives?.map((item) => {
         const products: LiveProduct[] = Array.isArray(item.products)
-          ? item.products.map((p: any, idx: number) => {
-              const imageUrl = extractProductImageUrl(p);
+          ? item.products.map((rawP: any, idx: number) => {
+              const p = rawP?.product || rawP;
+              const imageUrl = extractProductImageUrl(rawP);
               const title = p.name || p.title || `Product ${idx + 1}`;
               const priceVal =
                 typeof p.price === "number"
@@ -37,7 +38,7 @@ export default function HomeView() {
                   : "$10.99";
 
               return {
-                id: p._id || p.id || `p-${idx}`,
+                id: p._id || p.id || rawP._id || rawP.id || `p-${idx}`,
                 image: imageUrl,
                 discount: p.discount || "DEAL",
                 title: title,

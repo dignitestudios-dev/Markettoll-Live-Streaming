@@ -24,14 +24,22 @@ export interface APILiveItem {
 /**
  * Helper to extract the primary display image URL from a product object
  */
-export function extractProductImageUrl(p: any): string {
-  if (!p) return "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=400&q=80";
+export function extractProductImageUrl(rawP: any): string {
+  if (!rawP) return "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=400&q=80";
+
+  const p = rawP.product || rawP;
 
   // 1. Direct image or thumbnail property string
   if (typeof p.image === "string" && p.image) return p.image;
   if (typeof p.thumbnail === "string" && p.thumbnail) return p.thumbnail;
 
-  // 2. Images array from API payload
+  // 2. displayImage object or string
+  if (typeof p.displayImage === "string" && p.displayImage) return p.displayImage;
+  if (p.displayImage && typeof p.displayImage.url === "string" && p.displayImage.url) {
+    return p.displayImage.url;
+  }
+
+  // 3. Images array from API payload
   if (Array.isArray(p.images) && p.images.length > 0) {
     const displayImg = p.images.find((img: any) => img && (img.displayImage === true || img.isDisplay === true));
     if (displayImg && typeof displayImg.url === "string" && displayImg.url) {

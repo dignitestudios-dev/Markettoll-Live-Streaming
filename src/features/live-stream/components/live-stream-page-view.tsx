@@ -11,15 +11,17 @@ import LiveProductsCarousel, { LiveProductItem } from "./live-products-carousel"
 import LiveChatPanel from "./live-chat-panel";
 import CohostModal, { CohostParticipant } from "./cohost-modal";
 import CohostInviteModal from "./cohost-invite-modal";
+import CohostProductSelectModal from "./cohost-product-select-modal";
 import EndStreamModal from "./end-stream-modal";
 import ShareModal from "./share-modal";
 import ChooseDeliveryModal from "./choose-delivery-modal";
 import { useAuth } from "@/hooks/use-auth";
 import { liveSocketService } from "../services/live-socket.service";
-import { getHMSRoomToken } from "../services/hms.service";
 import { useLivesQuery } from "@/features/home/api/lives.queries";
 import { extractProductImageUrl } from "@/features/home/api/lives.service";
 import axiosInstance from "@/lib/axios";
+import queryClient from "@/lib/query-client";
+import { fetchLiveStreamsAPI } from "../../home/api/lives.service";
 
 export default function LiveStreamPageView() {
   const router = useRouter();
@@ -31,7 +33,7 @@ export default function LiveStreamPageView() {
   const [selectedProduct, setSelectedProduct] = useState<LiveProductItem | null>(null);
 
   // Fetch lives API data
-  const { data: rawLives } = useLivesQuery();
+  const { data: rawLives,refetch } = useLivesQuery();
 
   // Determine if current user is Host vs Viewer
   const [isHost, setIsHost] = useState<boolean>(() => {
@@ -42,6 +44,7 @@ export default function LiveStreamPageView() {
     return false;
   });
 
+  const [actualLiveId, setActualLiveId] = useState<string>(liveId);
   const [isLiveEnded, setIsLiveEnded] = useState<boolean>(false);
   const [hostUserId, setHostUserId] = useState<string | undefined>(undefined);
 
@@ -50,6 +53,27 @@ export default function LiveStreamPageView() {
 
   const [socketProducts, setSocketProducts] = useState<any[]>([]);
 
+  // Sync actual live ID & host user ID from rawLives
+  useEffect(() => {
+    if (Array.isArray(rawLives)) {
+      const currentLive = rawLives.find(
+        (item: any) =>
+          item._id === liveId ||
+          item.id === liveId ||
+          item.host?._id === liveId ||
+          item.host?.id === liveId
+      );
+      if (currentLive) {
+        if (currentLive._id) {
+          setActualLiveId(currentLive._id);
+        }
+        if (currentLive.host?._id) {
+          setHostUserId(currentLive.host._id);
+        }
+      }
+    }
+  }, [rawLives, liveId]);
+
   // Extract products dynamically from API or Socket ACK for active live session
   const activeLiveProducts: LiveProductItem[] = useMemo(() => {
     let rawProducts: any[] = [];
@@ -57,21 +81,23 @@ export default function LiveStreamPageView() {
       rawProducts = socketProducts;
     } else if (Array.isArray(rawLives)) {
       const currentLive = rawLives.find(
-        (item: any) => item._id === liveId || item.id === liveId
+        (item: any) =>
+          item._id === liveId ||
+          item.id === liveId ||
+          item._id === actualLiveId ||
+          item.id === actualLiveId ||
+          item.host?._id === liveId ||
+          item.host?.id === liveId
       );
-      if (currentLive) {
-        if (currentLive.host?._id) {
-          setHostUserId(currentLive.host._id);
-        }
-        if (Array.isArray(currentLive.products)) {
-          rawProducts = currentLive.products;
-        }
+      if (currentLive && Array.isArray(currentLive.products)) {
+        rawProducts = currentLive.products;
       }
     }
 
     if (rawProducts.length > 0) {
-      return rawProducts.map((p: any, idx: number) => {
-        const imageUrl = extractProductImageUrl(p);
+      return rawProducts.map((rawP: any, idx: number) => {
+        const p = rawP?.product || rawP;
+        const imageUrl = extractProductImageUrl(rawP);
         const title = p.name || p.title || `Product ${idx + 1}`;
         const price =
           typeof p.price === "number"
@@ -90,20 +116,44 @@ export default function LiveStreamPageView() {
         const soldCount =
           p.quantitySold !== undefined ? `${p.quantitySold}` : p.soldCount || "0";
 
+        const uploaderRole =
+          rawP?.uploaderRole ||
+          p?.uploaderRole ||
+          rawP?.role ||
+          p?.role ||
+          rawP?.uploadedByRole ||
+          p?.uploadedByRole ||
+          (rawP?.isCohost ? "co-host" : undefined) ||
+          (rawP?.isHost ? "host" : undefined) ||
+          undefined;
+
+        const uploaderName =
+          rawP?.uploadedBy?.name ||
+          p?.uploadedBy?.name ||
+          (typeof rawP?.uploadedBy === "string" ? rawP.uploadedBy : undefined) ||
+          (typeof p?.uploadedBy === "string" ? p.uploadedBy : undefined) ||
+          rawP?.uploader?.name ||
+          p?.uploader?.name ||
+          rawP?.uploaderName ||
+          p?.uploaderName ||
+          undefined;
+
         return {
-          id: p._id || p.id || `p-${idx}`,
+          id: p._id || p.id || rawP._id || rawP.id || `p-${idx}`,
           title,
           price,
           originalPrice,
           discount,
           image: imageUrl,
           soldCount,
+          uploaderRole,
+          uploaderName,
         };
       });
     }
 
     return [];
-  }, [rawLives, socketProducts, liveId]);
+  }, [rawLives, socketProducts, liveId, actualLiveId]);
 
   // 100ms SDK
   const hmsActions = useHMSActions();
@@ -187,6 +237,9 @@ export default function LiveStreamPageView() {
     liveId: string;
     invitationId?: string;
   } | null>(null);
+
+  // Co-host product selection modal state (after accepting invitation)
+  const [isCohostProductModalOpen, setIsCohostProductModalOpen] = useState(false);
 
   const hasJoinedRef = useRef(false);
 
@@ -274,13 +327,18 @@ export default function LiveStreamPageView() {
               }
             }
 
-            const hostId = res?.data?.live?.host?._id || res?.data?.live?.host;
+            const liveObj = res?.data?.live;
+            if (liveObj?._id) {
+              setActualLiveId(liveObj._id);
+            }
+
+            const hostId = liveObj?.host?._id || liveObj?.host;
             if (hostId) {
               setHostUserId(typeof hostId === "string" ? hostId : hostId._id);
             }
 
-            if (res?.data?.live?.products && Array.isArray(res.data.live.products)) {
-              setSocketProducts(res.data.live.products);
+            if (liveObj?.products && Array.isArray(liveObj.products)) {
+              setSocketProducts(liveObj.products);
             }
 
             token = res?.data?.token || "";
@@ -357,15 +415,33 @@ export default function LiveStreamPageView() {
 
     // Co-host event listeners
     const handleCohostInvited = (data: any) => {
+      const resData = data?.data || data;
+      const resolvedLiveId =
+        resData?.liveId ||
+        resData?.live?._id ||
+        resData?.live?.id ||
+        resData?._id ||
+        data?.liveId;
+
+      if (resolvedLiveId) {
+        setActualLiveId(resolvedLiveId);
+      }
+
       setCohostInvite({
-        hostUsername: data?.data?.hostUsername || "Host",
-        liveId: data?.data?.liveId || liveId,
-        invitationId: data?.data?.invitationId,
+        hostUsername: resData?.hostUsername || resData?.host?.name || resData?.host?.username || "Host",
+        liveId: resolvedLiveId || actualLiveId || liveId,
+        invitationId: resData?.invitationId,
       });
     };
 
     const handleCohostAdded = (data: any) => {
       const resData = data?.data || data;
+      
+      // Fresh API call to get updated live streams data bypassing cache
+      refetch();
+      fetchLiveStreamsAPI();
+      queryClient.refetchQueries({ queryKey: ["lives"] });
+
       const username = resData?.username || resData?.user?.name || resData?.name || "Co-Host";
       toast.success(`${username} joined as co-host.`);
       const userId = resData?.userId || resData?.user?._id || resData?._id;
@@ -404,6 +480,11 @@ export default function LiveStreamPageView() {
 
     const handleCohostRemoved = (data: any) => {
       const resData = data?.data || data;
+      
+      // Fresh API call when cohost is removed
+      refetch();
+      queryClient.refetchQueries({ queryKey: ["lives"] });
+
       const userId = typeof resData === "string" ? resData : resData?.userId || resData?.user?._id || resData?._id;
       if (userId) {
         setCohosts((prev) => prev.filter((c) => c.userId !== userId));
@@ -441,6 +522,13 @@ export default function LiveStreamPageView() {
       }
     };
 
+    const handleProductsUpdated = (data: any) => {
+      const prods = data?.data?.products || data?.products || data?.data;
+      if (Array.isArray(prods)) {
+        setSocketProducts(prods);
+      }
+    };
+
     socket.on("live:viewer-count-updated", handleViewerCountUpdated);
     socket.on("live:ended", handleLiveEnded);
     socket.on("live:host-reconnected", handleHostReconnected);
@@ -451,6 +539,8 @@ export default function LiveStreamPageView() {
     socket.on("live:cohost-removed", handleCohostRemoved);
     socket.on("live:cohost-muted", handleCohostMuted);
     socket.on("live:cohost-unmuted", handleCohostUnmuted);
+    socket.on("live:products-updated", handleProductsUpdated);
+    socket.on("live:product-added", handleProductsUpdated);
 
     return () => {
       isMounted = false;
@@ -464,6 +554,8 @@ export default function LiveStreamPageView() {
       socket.off("live:cohost-removed", handleCohostRemoved);
       socket.off("live:cohost-muted", handleCohostMuted);
       socket.off("live:cohost-unmuted", handleCohostUnmuted);
+      socket.off("live:products-updated", handleProductsUpdated);
+      socket.off("live:product-added", handleProductsUpdated);
     };
   }, [liveId, isHost, amIHost, isHMSConnected, hmsActions]);
 
@@ -826,13 +918,16 @@ export default function LiveStreamPageView() {
                 }}
               />
 
-              {/* Products Showcase Carousel (Viewer Only) */}
-              {!isHost && (
-                <LiveProductsCarousel
-                  products={activeLiveProducts}
-                  onAddToCart={handleAddToCart}
-                />
-              )}
+              {/* Products Showcase Carousel (Visible to Host, Co-host & Viewers) */}
+              <LiveProductsCarousel
+                products={activeLiveProducts}
+                onAddToCart={handleAddToCart}
+                onRefresh={async () => {
+                  setSocketProducts([]);
+                  await refetch();
+                }}
+                showAddToCart={!isHost && !isCohost}
+              />
             </div>
 
             {/* Right Column: Real-time Audience Chat */}
@@ -882,8 +977,25 @@ export default function LiveStreamPageView() {
           invitationId={cohostInvite.invitationId}
           onAccept={async () => {
             try {
-              await liveSocketService.acceptCohost(cohostInvite.liveId, localPeer?.id);
+              const rawRes = await liveSocketService.acceptCohost(cohostInvite.liveId, localPeer?.id);
+              const res = Array.isArray(rawRes) ? rawRes[0] : rawRes;
+              console.log("[Accept Co-Host Response]:", res);
+
+              const resolvedLiveId =
+                res?.data?.live?._id ||
+                res?.data?.live?.id ||
+                res?.data?.liveId ||
+                res?.data?._id ||
+                res?.liveId ||
+                cohostInvite.liveId ||
+                actualLiveId;
+
+              if (resolvedLiveId) {
+                setActualLiveId(resolvedLiveId);
+              }
+
               toast.info("Accepted co-host invitation. Connecting to stream...");
+              setIsCohostProductModalOpen(true);
             } catch (err) {
               toast.error("Failed to accept co-host invitation.");
             } finally {
@@ -902,6 +1014,16 @@ export default function LiveStreamPageView() {
           }}
         />
       )}
+
+      {/* Co-Host Product Selection Modal */}
+      <CohostProductSelectModal
+        isOpen={isCohostProductModalOpen}
+        liveId={actualLiveId || cohostInvite?.liveId || liveId}
+        onClose={() => setIsCohostProductModalOpen(false)}
+        onSuccess={(addedProductIds) => {
+          console.log("[Co-Host] Products added to live:", addedProductIds);
+        }}
+      />
 
       <ChooseDeliveryModal
         showPopup={showDeliveryModal}

@@ -1,15 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchLiveStreamsAPI } from "./lives.service";
-
-export const liveKeys = {
-  all: ["lives"] as const,
-  list: () => [...liveKeys.all, "list"] as const,
-};
+// export const liveKeys = {
+//   all: ["lives"] as const,
+// };
 
 export function useLivesQuery() {
   return useQuery({
-    queryKey: liveKeys.list(),
+    queryKey: ["lives"],
     queryFn: fetchLiveStreamsAPI,
-    staleTime: 1000 * 30, 
+    staleTime: 1000 * 30,
   });
 }

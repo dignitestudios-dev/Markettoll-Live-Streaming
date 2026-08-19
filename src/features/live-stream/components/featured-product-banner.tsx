@@ -9,6 +9,8 @@ interface Product {
   price: number;
   originalPrice?: number;
   image: string;
+  uploaderRole?: string;
+  uploaderName?: string;
 }
 
 interface FeaturedProductBannerProps {
@@ -24,12 +26,38 @@ export default function FeaturedProductBanner({
 }: FeaturedProductBannerProps) {
   if (!product) return null;
 
+  const roleLower = product.uploaderRole?.toLowerCase().trim() || "";
+  const isHostProduct = roleLower === "host";
+  const isCohostProduct =
+    roleLower === "co-host" ||
+    roleLower === "cohost" ||
+    roleLower === "co_host";
+
   return (
     <div className="absolute top-4 right-4 z-30 max-w-[320px] bg-[#161D2A]/90 backdrop-blur-lg border border-white/20 rounded-2xl p-3 shadow-2xl animate-in slide-in-from-top-4 duration-300 select-none">
       <div className="flex items-center justify-between pb-2 border-b border-white/10 mb-2">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-[#0098EA] bg-[#0098EA]/15 px-2 py-0.5 rounded-full">
-          Featured Product
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[#0098EA] bg-[#0098EA]/15 px-2 py-0.5 rounded-full">
+            Featured Product
+          </span>
+          {product.uploaderRole && (
+            <span
+              className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                isHostProduct
+                  ? "bg-[#0098EA]/20 text-[#0098EA] border border-[#0098EA]/30"
+                  : isCohostProduct
+                  ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
+                  : "bg-gray-500/20 text-gray-300 border border-gray-500/30"
+              }`}
+            >
+              {isHostProduct
+                ? "👑 Host"
+                : isCohostProduct
+                ? "🤝 Co-Host"
+                : product.uploaderRole}
+            </span>
+          )}
+        </div>
         {onClose && (
           <button
             type="button"
@@ -49,6 +77,11 @@ export default function FeaturedProductBanner({
         />
         <div className="flex-1 min-w-0">
           <h4 className="text-xs font-semibold text-white truncate">{product.name}</h4>
+          {product.uploaderName && (
+            <p className="text-[10px] text-gray-400 truncate">
+              by <span className="text-gray-300 font-medium">{product.uploaderName}</span>
+            </p>
+          )}
           <div className="flex items-baseline gap-1.5 mt-0.5">
             <span className="text-sm font-bold text-emerald-400">${product.price.toFixed(2)}</span>
             {product.originalPrice && (
@@ -64,9 +97,3 @@ export default function FeaturedProductBanner({
         type="button"
         onClick={() => onBuyNow && onBuyNow(product)}
         className="w-full mt-2.5 py-1.5 bg-[#0098EA] hover:bg-[#0082c9] active:scale-95 text-white text-xs font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
-      >
-        <IoCartOutline className="text-sm" /> Buy Now
-      </button>
-    </div>
-  );
-}
