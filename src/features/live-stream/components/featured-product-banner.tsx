@@ -97,3 +97,9 @@ export default function FeaturedProductBanner({
         type="button"
         onClick={() => onBuyNow && onBuyNow(product)}
         className="w-full mt-2.5 py-1.5 bg-[#0098EA] hover:bg-[#0082c9] active:scale-95 text-white text-xs font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+      >
+        <IoCartOutline className="text-sm" /> Buy Now
+      </button>
+    </div>
+  );
+}
