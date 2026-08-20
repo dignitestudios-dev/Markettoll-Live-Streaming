@@ -90,20 +90,7 @@ export default function Sidebar({
                     >
                       Notifications
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => toggleSidebarAndNavigate("/settings/payment")}
-                      className="text-[13px] font-medium text-gray-600 hover:text-[#0098EA]"
-                    >
-                      Payment
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => toggleSidebarAndNavigate("/settings/addresses")}
-                      className="text-[13px] font-medium text-gray-600 hover:text-[#0098EA]"
-                    >
-                      Address
-                    </button>
+                 
                     <button
                       type="button"
                       onClick={() => toggleSidebarAndNavigate("/settings/change-password")}
@@ -111,13 +98,7 @@ export default function Sidebar({
                     >
                       Change Password
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => toggleSidebarAndNavigate("/settings/deactivate-listing")}
-                      className="text-[13px] font-medium text-gray-600 hover:text-[#0098EA]"
-                    >
-                      Deactivate Listing
-                    </button>
+                   
                     <button
                       type="button"
                       onClick={() => toggleSidebarAndNavigate("/terms-and-conditions")}
@@ -132,13 +113,7 @@ export default function Sidebar({
                     >
                       Privacy Policy
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => toggleSidebarAndNavigate("/settings/support-request")}
-                      className="text-[13px] font-medium text-gray-600 hover:text-[#0098EA]"
-                    >
-                      Support Request
-                    </button>
+                  
                     <button
                       type="button"
                       onClick={() => toggleSidebarAndNavigate("/settings/delete-account")}

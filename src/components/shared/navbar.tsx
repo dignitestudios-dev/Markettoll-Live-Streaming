@@ -302,7 +302,7 @@ export default function Navbar() {
       <div className="lg:hidden flex items-center justify-end gap-3">
         {user?.role !== "influencer" && pathname !== "/auth/login" && pathname !== "/login" && (
           <>
-            <Link
+            {/* <Link
               href="/chats"
               className="w-[28px] h-[28px] bg-white rounded-[10px] flex items-center justify-center"
             >
@@ -334,7 +334,7 @@ export default function Navbar() {
                 alt="cart-icon"
                 className="w-[15px] h-[15px]"
               />
-            </Link>
+            </Link> */}
 
             <button
               type="button"
