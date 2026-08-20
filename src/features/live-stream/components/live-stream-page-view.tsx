@@ -537,6 +537,9 @@ export default function LiveStreamPageView() {
     socket.on("live:cohost-added", handleCohostAdded);
     socket.on("live:cohost-rejected", handleCohostRejected);
     socket.on("live:cohost-removed", handleCohostRemoved);
+    socket.on("live:cohost-left", handleCohostRemoved);
+    socket.on("live:user-left", handleCohostRemoved);
+    socket.on("live:participant-left", handleCohostRemoved);
     socket.on("live:cohost-muted", handleCohostMuted);
     socket.on("live:cohost-unmuted", handleCohostUnmuted);
     socket.on("live:products-updated", handleProductsUpdated);
@@ -552,6 +555,9 @@ export default function LiveStreamPageView() {
       socket.off("live:cohost-added", handleCohostAdded);
       socket.off("live:cohost-rejected", handleCohostRejected);
       socket.off("live:cohost-removed", handleCohostRemoved);
+      socket.off("live:cohost-left", handleCohostRemoved);
+      socket.off("live:user-left", handleCohostRemoved);
+      socket.off("live:participant-left", handleCohostRemoved);
       socket.off("live:cohost-muted", handleCohostMuted);
       socket.off("live:cohost-unmuted", handleCohostUnmuted);
       socket.off("live:products-updated", handleProductsUpdated);
@@ -567,7 +573,7 @@ export default function LiveStreamPageView() {
 
     pendingPromotions.forEach((userId) => {
       // Find the peer in the room where customerUserId matches the user's ID
-      const peer = hmsPeers.find((p) => p.customerUserId === userId);
+      const peer = hmsPeers.find((p) => p.customerUserId === userId || p.id === userId);
       if (peer) {
         const normalizedRole = peer.roleName?.toLowerCase() || "";
         if (normalizedRole === "co-host" || normalizedRole === "cohost" || normalizedRole === "co_host") {
@@ -634,29 +640,31 @@ export default function LiveStreamPageView() {
         const status = currentStatus[cohost.userId];
         if (!status) return;
 
-        const isPresentIn100ms = hmsPeers.some((p) => p.customerUserId === cohost.userId);
+        const isPresentIn100ms = hmsPeers.some(
+          (p) =>
+            p.customerUserId === cohost.userId ||
+            p.id === cohost.userId ||
+            (cohost.username && p.name && cohost.username.toLowerCase() === p.name.toLowerCase())
+        );
 
         if (isPresentIn100ms) {
           status.hasJoined100ms = true;
           status.lastSeenIn100ms = now;
         } else {
-          // If they have never joined 100ms, wait 15s to allow them to connect.
-          // If they did join but are now gone, wait 5s grace period before kicking.
-          const gracePeriod = status.hasJoined100ms ? 5000 : 15000;
-          const timeSinceLastSeen = now - (status.hasJoined100ms ? status.lastSeenIn100ms : status.addedAt);
-
-          if (timeSinceLastSeen > gracePeriod) {
-            liveSocketService.kickCohost(liveId, cohost.userId).then((res) => {
-              if (res.success) {
-                setCohosts((prev) => prev.filter((c) => c.userId !== cohost.userId));
-              }
-            }).catch((err) => {
-              console.warn("Failed to auto-cleanup cohost:", err);
-            });
+          // If they joined previously and left 100ms, immediately remove them from cohosts
+          if (status.hasJoined100ms) {
+            setCohosts((prev) => prev.filter((c) => c.userId !== cohost.userId));
+            liveSocketService.kickCohost(liveId, cohost.userId).catch(() => {});
+          } else {
+            // Never joined 100ms within 10 seconds -> cleanup
+            if (now - status.addedAt > 10000) {
+              setCohosts((prev) => prev.filter((c) => c.userId !== cohost.userId));
+              liveSocketService.kickCohost(liveId, cohost.userId).catch(() => {});
+            }
           }
         }
       });
-    }, 2000);
+    }, 1000);
 
     return () => clearInterval(timer);
   }, [hmsPeers, cohosts, amIHost, liveId]);

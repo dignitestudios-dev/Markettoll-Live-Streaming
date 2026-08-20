@@ -210,43 +210,59 @@ export default function LiveVideoGrid({
   };
 
   // Combine dynamic cohosts from Socket.IO and active 100ms peers
-  const activeParticipants: Participant[] = [];
+  const activeParticipants: {
+    userId: string;
+    username: string;
+    avatar: string;
+    videoTrack?: string;
+    isLocal?: boolean;
+    isMuted?: boolean;
+  }[] = [];
 
   // 1. Add all active cohost peers connected via 100ms
   cohostPeers.forEach((p) => {
-    const socketCohost = cohosts.find((c) => c.userId === p.customerUserId);
+    const socketCohost = cohosts.find(
+      (c) =>
+        c.userId === p.customerUserId ||
+        c.userId === p.id ||
+        (c.username && p.name && c.username.toLowerCase() === p.name.toLowerCase())
+    );
     activeParticipants.push({
       userId: p.id, // Use 100ms peer ID for key rendering stability
-      username: socketCohost?.username || (p.name && p.name !== "Viewer" ? p.name : p.isLocal ? "You (Co-Host)" : "Co-Host"),
-      avatar: socketCohost?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
+      username:
+        socketCohost?.username ||
+        (p.name && p.name !== "Viewer" ? p.name : p.isLocal ? "You (Co-Host)" : "Co-Host"),
+      avatar:
+        socketCohost?.avatar ||
+        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
       videoTrack: p.videoTrack,
+      isLocal: p.isLocal,
+      isMuted: socketCohost?.isMuted,
     });
   });
 
-  // 2. Add co-hosts from Socket.IO state who are not yet connected via 100ms
-  cohosts.forEach((c) => {
-    const isAlreadyConnected = cohostPeers.some((p) => p.customerUserId === c.userId);
-    
-    if (!isAlreadyConnected) {
-      activeParticipants.push({
-        userId: c.userId,
-        username: c.username && c.username !== "Someone" ? c.username : "Co-Host",
-        avatar: c.avatar || "",
-        videoTrack: undefined,
-      });
-    }
-  });
-  
+  // 2. If current user is cohost and local peer is not in cohostPeers yet, add local co-host preview
+  const isLocalCohostAdded = activeParticipants.some((p) => p.isLocal);
+  if (isCohost && !isLocalCohostAdded && localPeer) {
+    activeParticipants.unshift({
+      userId: localPeer.id,
+      username: "You (Co-Host)",
+      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
+      videoTrack: localPeer.videoTrack,
+      isLocal: true,
+      isMuted: !isMicOn,
+    });
+  }
 
   // Retrieve local peer's HMS video track (for host/cohost)
   const localPeerVideoTrack = useHMSStore(selectVideoTrackByPeerID(localPeer?.id));
   // Retrieve host's HMS video track (for viewers watching the host)
   const hostVideoTrack = useHMSStore(selectVideoTrackByPeerID(hostPeer?.id));
 
-  // Active main track ID: Host sees local track; Viewer & Co-Host see Host track (or fallback to local if cohost)
+  // Active main track ID: Host sees local track; Viewer & Co-Host see Host track
   const mainVideoTrackId = isHost
     ? localPeerVideoTrack?.id || (localPeer as any)?.videoTrack
-    : hostVideoTrack?.id || (hostPeer as any)?.videoTrack || (isCohost ? localPeerVideoTrack?.id : undefined);
+    : hostVideoTrack?.id || (hostPeer as any)?.videoTrack;
 
   return (
     <div
@@ -256,37 +272,108 @@ export default function LiveVideoGrid({
       {/* Top Left Floating Joined Participants / Co-Hosts Cards */}
       {activeParticipants?.length > 0 && (
         <div className="absolute top-4 left-4 z-20 flex items-center gap-3">
-          {activeParticipants?.map((participant) => (
-            <div
-              key={participant.userId}
-                className="relative w-18 h-24 sm:w-28 sm:h-32 rounded-2xl overflow-hidden border border-cyan-400/50 shadow-2xl group/card bg-black/60 backdrop-blur-md"
-            >
-              {participant.videoTrack ? (
-                <HMSVideoElement
-                  trackId={participant.videoTrack}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <img
-                  src={participant.avatar}
-                  alt={participant.username}
-                  className="w-full h-full object-cover group-hover/card:scale-105 transition-transform"
-                />
-              )}
-              <div className="absolute bottom-0 inset-x-0 bg-black/70 backdrop-blur-xs py-0.5 px-1 text-center">
-                <span className="text-[10px] font-semibold text-white truncate block">
-                  {participant.username}
-                </span>
+          {activeParticipants?.map((participant) => {
+            const isLocalCard = isCohost && (participant.isLocal || participant.userId === localPeer?.id);
+            const showVideo = participant.videoTrack && (isLocalCard ? isCameraOn : true);
+
+            return (
+              <div
+                key={participant.userId}
+                className="relative w-20 h-28 sm:w-28 sm:h-36 rounded-2xl overflow-hidden border border-cyan-400/50 shadow-2xl group/card bg-black/70 backdrop-blur-md flex flex-col justify-between"
+              >
+                {/* Background Video or Avatar */}
+                <div className="absolute inset-0 w-full h-full">
+                  {showVideo ? (
+                    <HMSVideoElement
+                      trackId={participant.videoTrack}
+                      className={`w-full h-full object-cover ${isLocalCard ? "-scale-x-100" : ""}`}
+                    />
+                  ) : (
+                    <div className="w-full h-full relative">
+                      <img
+                        src={participant.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80"}
+                        alt={participant.username}
+                        className="w-full h-full object-cover group-hover/card:scale-105 transition-transform"
+                      />
+                      {isLocalCard && !isCameraOn && (
+                        <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center">
+                          <IoVideocamOffOutline className="w-5 h-5 text-white/80" />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Top Controls: Interactive Mic/Camera for Local Co-Host, Muted badge for Remote */}
+                <div className="relative z-10 p-1.5 flex items-center justify-between w-full">
+                  {isLocalCard ? (
+                    <div className="flex items-center gap-1 w-full justify-end">
+                      {/* Co-Host Camera Button */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onToggleCamera) onToggleCamera();
+                        }}
+                        className={`p-1 sm:p-1.5 rounded-full backdrop-blur-md transition-colors cursor-pointer text-white shadow-md ${
+                          isCameraOn ? "bg-black/60 hover:bg-black/80" : "bg-red-500 hover:bg-red-600"
+                        }`}
+                        title={isCameraOn ? "Turn Off Camera" : "Turn On Camera"}
+                      >
+                        {isCameraOn ? (
+                          <IoVideocamOutline className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                        ) : (
+                          <IoVideocamOffOutline className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white" />
+                        )}
+                      </button>
+
+                      {/* Co-Host Mic Button */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (liveId) {
+                            liveSocketService.selfMute(liveId, isMicOn);
+                          }
+                          onToggleMic();
+                        }}
+                        className={`p-1 sm:p-1.5 rounded-full backdrop-blur-md transition-colors cursor-pointer text-white shadow-md ${
+                          isMicOn ? "bg-black/60 hover:bg-black/80" : "bg-red-500 hover:bg-red-600"
+                        }`}
+                        title={isMicOn ? "Mute Microphone" : "Unmute Microphone"}
+                      >
+                        {isMicOn ? (
+                          <IoMicOutline className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                        ) : (
+                          <IoMicOffOutline className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white" />
+                        )}
+                      </button>
+                    </div>
+                  ) : (
+                    participant.isMuted && (
+                      <div className="ml-auto p-1 rounded-full bg-red-500/90 text-white shadow">
+                        <IoMicOffOutline className="w-3 h-3" />
+                      </div>
+                    )
+                  )}
+                </div>
+
+                {/* Bottom User Label */}
+                <div className="relative z-10 bg-black/75 backdrop-blur-xs py-0.5 px-1 text-center mt-auto">
+                  <span className="text-[10px] font-semibold text-white truncate block">
+                    {participant.username}
+                  </span>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
-      {/* Top Right Mini Controls: Camera Toggle, Mic Toggle & Fullscreen Button */}
+      {/* Top Right Mini Controls: Host Camera Toggle, Host Mic Toggle & Fullscreen Button */}
       <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
-        {/* Camera Control Button (Host & Co-Host) */}
-        {isPublisher && !isLiveEnded && (
+        {/* Camera Control Button (Host Only) */}
+        {isHost && !isLiveEnded && (
           <button
             type="button"
             onClick={() => {
@@ -309,8 +396,8 @@ export default function LiveVideoGrid({
           </button>
         )}
 
-        {/* Mic Control Button (Host & Co-Host) */}
-        {isPublisher && !isLiveEnded && (
+        {/* Mic Control Button (Host Only) */}
+        {isHost && !isLiveEnded && (
           <button
             type="button"
             onClick={() => {
@@ -361,10 +448,10 @@ export default function LiveVideoGrid({
             <HMSVideoElement
               trackId={mainVideoTrackId}
               className={`w-full h-full object-contain bg-black transition-opacity duration-300 ${
-                isPublisher ? "-scale-x-100" : "scale-x-100"
+                isHost ? "-scale-x-100" : "scale-x-100"
               }`}
             />
-          ) : isPublisher && !isConnected && isCameraOn && streamActive ? (
+          ) : isHost && !isConnected && isCameraOn && streamActive ? (
             <video
               ref={hostVideoRef}
               autoPlay
@@ -382,7 +469,7 @@ export default function LiveVideoGrid({
               />
               <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center">
                 <span className="text-white/90 text-xs font-semibold px-4 py-2 rounded-full bg-black/70 backdrop-blur-md border border-white/15 shadow-lg">
-                  {isPublisher
+                  {isHost
                     ? isCameraOn
                       ? "Connecting Camera..."
                       : "Camera Off — Presenter Thumbnail Displayed"

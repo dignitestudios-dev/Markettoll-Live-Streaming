@@ -314,12 +314,26 @@ export default function CohostModal({
       }
     };
 
+    const handleCohostAdded = (data: any) => {
+      const resData = data?.data || data;
+      const userId = resData?.userId || resData?.user?._id || resData?._id;
+      if (userId) {
+        setInvitedUserIds((prev) => {
+          const next = new Set(prev);
+          next.delete(userId);
+          return next;
+        });
+      }
+    };
+
     socket.on("live:cohost-rejected", handleCohostRejected);
     socket.on("live:cohost-removed", handleCohostRemoved);
+    socket.on("live:cohost-added", handleCohostAdded);
 
     return () => {
       socket.off("live:cohost-rejected", handleCohostRejected);
       socket.off("live:cohost-removed", handleCohostRemoved);
+      socket.off("live:cohost-added", handleCohostAdded);
     };
   }, []);
 
@@ -372,18 +386,6 @@ export default function CohostModal({
           next.add(userId);
           return next;
         });
-
-        if (!cohosts.some((c) => c.userId === userId)) {
-          onUpdateCohosts([
-            ...cohosts,
-            {
-              userId,
-              username: userName,
-              role: "cohost",
-              isMuted: false,
-            },
-          ]);
-        }
       } else {
         toast.error(res.message || "Failed to send invitation.");
       }
