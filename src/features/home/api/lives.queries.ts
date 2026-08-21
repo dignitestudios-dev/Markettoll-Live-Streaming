@@ -8,6 +8,8 @@ export function useLivesQuery() {
   return useQuery({
     queryKey: ["lives"],
     queryFn: fetchLiveStreamsAPI,
-    staleTime: 1000 * 30,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 }

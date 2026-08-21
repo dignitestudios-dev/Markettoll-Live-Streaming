@@ -378,6 +378,14 @@ export default function LiveStreamPageView() {
     const handleLiveEnded = () => {
       setIsLiveEnded(true);
       toast.info("The live stream has ended.");
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("current_host_live_id");
+        sessionStorage.removeItem(`hms_token_${liveId}`);
+        sessionStorage.removeItem(`host_mic_${liveId}`);
+        sessionStorage.removeItem(`host_camera_${liveId}`);
+      }
+      queryClient.invalidateQueries({ queryKey: ["lives"] });
+      queryClient.refetchQueries({ queryKey: ["lives"] });
       hmsActions.leave().catch(() => {});
     };
 
@@ -720,6 +728,14 @@ export default function LiveStreamPageView() {
         console.warn("HMS leave error:", e);
       }
       await liveSocketService.endLive(liveId);
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("current_host_live_id");
+        sessionStorage.removeItem(`hms_token_${liveId}`);
+        sessionStorage.removeItem(`host_mic_${liveId}`);
+        sessionStorage.removeItem(`host_camera_${liveId}`);
+      }
+      queryClient.invalidateQueries({ queryKey: ["lives"] });
+      queryClient.refetchQueries({ queryKey: ["lives"] });
       setIsEndModalOpen(false);
       setIsLiveEnded(true);
       router.push("/");
@@ -784,6 +800,8 @@ export default function LiveStreamPageView() {
         console.warn("HMS leave error:", e);
       }
       await liveSocketService.leaveLive(liveId);
+      queryClient.invalidateQueries({ queryKey: ["lives"] });
+      queryClient.refetchQueries({ queryKey: ["lives"] });
       toast.info("You left the live stream.");
       router.push("/");
     } catch (error: any) {

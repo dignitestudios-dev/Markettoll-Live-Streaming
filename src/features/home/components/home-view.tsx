@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 import HomeHeader from "./home-header";
@@ -10,6 +10,7 @@ import { LiveProduct, LiveStream } from "../types/home.types";
 import { useLivesQuery } from "../api/lives.queries";
 import { extractProductImageUrl } from "../api/lives.service";
 import { liveSocketService } from "@/features/live-stream/services/live-socket.service";
+import queryClient from "@/lib/query-client";
 import { IoClose } from "react-icons/io5";
 import { Eye } from "lucide-react";
 
@@ -20,49 +21,74 @@ export default function HomeView() {
   const [joiningId, setJoiningId] = useState<string | null>(null);
 
   // Fetch lives via React Query useLivesQuery hook
-  const { data: rawLives, isLoading } = useLivesQuery();
+  const { data: rawLives, isLoading, refetch } = useLivesQuery();
+
+  // Always fetch fresh lives on component mount
+  useEffect(() => {
+    refetch();
+    queryClient.invalidateQueries({ queryKey: ["lives"] });
+  }, [refetch]);
+
+  // Real-time socket updates for created/ended streams
+  useEffect(() => {
+    const socket = liveSocketService.connect();
+    const handleLivesUpdated = () => {
+      refetch();
+      queryClient.invalidateQueries({ queryKey: ["lives"] });
+    };
+
+    socket.on("live:ended", handleLivesUpdated);
+    socket.on("live:created", handleLivesUpdated);
+
+    return () => {
+      socket.off("live:ended", handleLivesUpdated);
+      socket.off("live:created", handleLivesUpdated);
+    };
+  }, [refetch]);
 
   const streams: LiveStream[] = useMemo(() => {
     if (Array.isArray(rawLives)) {
-      return rawLives?.map((item) => {
-        const products: LiveProduct[] = Array.isArray(item.products)
-          ? item.products.map((rawP: any, idx: number) => {
-              const p = rawP?.product || rawP;
-              const imageUrl = extractProductImageUrl(rawP);
-              const title = p.name || p.title || `Product ${idx + 1}`;
-              const priceVal =
-                typeof p.price === "number"
-                  ? `$${p.price.toFixed(2)}`
-                  : p.price
-                  ? `$${p.price}`
-                  : "$10.99";
+      return rawLives
+        ?.filter((item: any) => item.status !== "ended" && item.status !== "closed")
+        .map((item) => {
+          const products: LiveProduct[] = Array.isArray(item.products)
+            ? item.products.map((rawP: any, idx: number) => {
+                const p = rawP?.product || rawP;
+                const imageUrl = extractProductImageUrl(rawP);
+                const title = p.name || p.title || `Product ${idx + 1}`;
+                const priceVal =
+                  typeof p.price === "number"
+                    ? `$${p.price.toFixed(2)}`
+                    : p.price
+                    ? `$${p.price}`
+                    : "$10.99";
 
-              return {
-                id: p._id || p.id || rawP._id || rawP.id || `p-${idx}`,
-                image: imageUrl,
-                discount: p.discount || "DEAL",
-                title: title,
-                price: priceVal,
-                originalPrice: p.originalPrice ? `$${p.originalPrice}` : undefined,
-              };
-            })
-          : [];
+                return {
+                  id: p._id || p.id || rawP._id || rawP.id || `p-${idx}`,
+                  image: imageUrl,
+                  discount: p.discount || "DEAL",
+                  title: title,
+                  price: priceVal,
+                  originalPrice: p.originalPrice ? `$${p.originalPrice}` : undefined,
+                };
+              })
+            : [];
 
-        return {
-          id: item._id,
-          streamerName: item.host?.name || "Lillian Bakerss",
-          streamerAvatar:
-            item.host?.avatar ||
-            "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
-          category: item.category || "General",
-          title: item.title || "Live Shopping Stream",
-          viewerCount: String(item.viewerCount || 0),
-          thumbnail: item?.thumbnail || "",
-          products: products,
-          isLive: item.status === "live" || true,
-          duration: "Live Now",
-        };
-      });
+          return {
+            id: item._id,
+            streamerName: item.host?.name || "Lillian Bakerss",
+            streamerAvatar:
+              item.host?.avatar ||
+              "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
+            category: item.category || "General",
+            title: item.title || "Live Shopping Stream",
+            viewerCount: String(item.viewerCount || 0),
+            thumbnail: item?.thumbnail || "",
+            products: products,
+            isLive: item.status === "live" || !item.status,
+            duration: "Live Now",
+          };
+        });
     }
     return [];
   }, [rawLives]);
