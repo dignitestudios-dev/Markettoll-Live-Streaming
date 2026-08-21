@@ -9,6 +9,7 @@ import { HMSRoomProvider } from "@100mslive/react-sdk";
 import Cookies from "js-cookie";
 import { store, useAppDispatch } from "@/store";
 import { setCredentials } from "@/store/slices/auth.slice";
+import GlobalLiveReconnectListener from "@/features/live-stream/components/global-live-reconnect-listener";
 
 function AuthRehydrator({ children }: { children: React.ReactNode }) {
   const dispatch = useAppDispatch();
@@ -87,6 +88,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       <QueryClientProvider client={queryClient}>
         <HMSRoomProvider>
           <AuthRehydrator>
+            <GlobalLiveReconnectListener />
             {children}
             <ToastContainer position="top-right" autoClose={3000} />
           </AuthRehydrator>

@@ -1,14 +1,17 @@
 import axiosInstance from "@/lib/axios";
 
 export interface APILiveHost {
-  _id: string;
+  _id?: string;
+  id?: string;
   name?: string;
   avatar?: string;
+  [key: string]: any;
 }
 
 export interface APILiveItem {
-  _id: string;
-  host?: APILiveHost;
+  _id?: string;
+  id?: string;
+  host?: APILiveHost | string;
   title: string;
   description?: string;
   category?: string;
@@ -19,6 +22,7 @@ export interface APILiveItem {
   hmsRoomId?: string;
   viewerCount?: number;
   createdAt?: string;
+  [key: string]: any;
 }
 
 /**

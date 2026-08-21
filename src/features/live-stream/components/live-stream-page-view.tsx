@@ -38,7 +38,9 @@ export default function LiveStreamPageView() {
   // Determine if current user is Host vs Viewer
   const [isHost, setIsHost] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
-      const currentHostLiveId = sessionStorage.getItem("current_host_live_id");
+      const currentHostLiveId =
+        sessionStorage.getItem("current_host_live_id") ||
+        localStorage.getItem("current_host_live_id");
       return currentHostLiveId === liveId;
     }
     return false;
@@ -67,12 +69,28 @@ export default function LiveStreamPageView() {
         if (currentLive._id) {
           setActualLiveId(currentLive._id);
         }
-        if (currentLive.host?._id) {
-          setHostUserId(currentLive.host._id);
+        const hostObj = typeof currentLive.host === "object" ? currentLive.host : null;
+        const hostId =
+          hostObj?._id ||
+          hostObj?.id ||
+          (typeof currentLive.host === "string" ? currentLive.host : undefined);
+        if (hostId) {
+          setHostUserId(hostId);
+          const currentUserId = (user as any)?._id || (user as any)?.id;
+          if (currentUserId && String(hostId) === String(currentUserId)) {
+            setIsHost(true);
+            if (typeof window !== "undefined") {
+              sessionStorage.setItem("current_host_live_id", currentLive._id || liveId);
+              localStorage.setItem("current_host_live_id", currentLive._id || liveId);
+            }
+          }
+        }
+        if (currentLive.products && Array.isArray(currentLive.products) && socketProducts.length === 0) {
+          setSocketProducts(currentLive.products);
         }
       }
     }
-  }, [rawLives, liveId]);
+  }, [rawLives, liveId, user, socketProducts.length]);
 
   // Extract products dynamically from API or Socket ACK for active live session
   const activeLiveProducts: LiveProductItem[] = useMemo(() => {
@@ -252,10 +270,13 @@ export default function LiveStreamPageView() {
       hasJoinedRef.current = true;
 
       if (isHost) {
-        // HOST FLOW: Host created stream (live:create). Host uses create token or fallback socket ACK token.
+        // HOST FLOW: Host created stream or reconnected. Host uses create/reconnect token or fallback socket ACK token.
         let token = "";
         if (typeof window !== "undefined") {
-          token = sessionStorage.getItem(`hms_token_${liveId}`) || "";
+          token =
+            sessionStorage.getItem(`hms_token_${liveId}`) ||
+            localStorage.getItem(`hms_token_${liveId}`) ||
+            "";
         }
 
         if (!token) {
@@ -389,16 +410,43 @@ export default function LiveStreamPageView() {
       hmsActions.leave().catch(() => {});
     };
 
-    const handleHostReconnected = async (data: any) => {
-      const freshToken = data?.data?.token || data?.token;
+    const handleHostReconnected = async (rawRes: any) => {
+      const res = Array.isArray(rawRes) ? rawRes[0] : rawRes;
+      const resData = res?.data || res;
+      const freshToken = resData?.token || res?.token;
+      const liveData = resData?.live;
+      const streamLiveId = liveData?._id || resData?.liveId || resData?.roomId || liveId;
+
+      setIsHost(true);
+      if (liveData?._id) {
+        setActualLiveId(liveData._id);
+      }
+      if (liveData?.host) {
+        const hId = typeof liveData.host === "string" ? liveData.host : liveData.host?._id || liveData.host?.id;
+        if (hId) setHostUserId(hId);
+      }
+      if (liveData?.products && Array.isArray(liveData.products)) {
+        setSocketProducts(liveData.products);
+      }
+
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("current_host_live_id", streamLiveId);
+        localStorage.setItem("current_host_live_id", streamLiveId);
+        if (freshToken) {
+          sessionStorage.setItem(`hms_token_${streamLiveId}`, freshToken);
+          localStorage.setItem(`hms_token_${streamLiveId}`, freshToken);
+        }
+      }
+
       if (freshToken) {
         try {
-          await hmsActions.leave();
-          await hmsActions.join({ authToken: freshToken, userName: isHost ? "Host" : "Viewer" });
-          if (!isHost && !isCohost) {
-            hmsActions.setLocalVideoEnabled(false);
-            hmsActions.setLocalAudioEnabled(false);
-          }
+          await hmsActions.leave().catch(() => {});
+          await hmsActions.join({
+            authToken: freshToken,
+            userName: user?.name || user?.username || "Host",
+          });
+          hmsActions.setLocalVideoEnabled(isCameraOn);
+          hmsActions.setLocalAudioEnabled(isMicOn);
         } catch (e) {
           console.warn("HMS Reconnect rejoin error:", e);
         }
@@ -959,7 +1007,8 @@ export default function LiveStreamPageView() {
             {/* Right Column: Real-time Audience Chat */}
             <LiveChatPanel
               liveId={liveId}
-              currentUsername={isHost ? "Host" : "Viewer"}
+              isHost={isHost}
+              currentUsername={user?.name || user?.username || ""}
               isLiveEnded={isLiveEnded}
             />
           </div>

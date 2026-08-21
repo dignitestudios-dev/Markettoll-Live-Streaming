@@ -10,7 +10,7 @@ export interface ChatMessage {
   sender: string;
   username: string;
   avatar?: string;
-  role: "host" | "cohost" | "viewer";
+  role?: "host" | "cohost" | "viewer" | string;
   message: string;
   createdAt: string;
 }
@@ -30,8 +30,12 @@ export default function LiveChatPanel({
 }: LiveChatPanelProps) {
   const { user } = useAuth();
   const currentUserId = (user as any)?._id || (user as any)?.id ? String((user as any)?._id || (user as any)?.id) : "";
-  const userAvatar = (user as any)?.avatar || (user as any)?.image || (user as any)?.profileImage || "";
-  const displayName = currentUsername || user?.name || (isHost ? "Host" : "Viewer");
+  const userAvatar =
+    (user as any)?.profileImage ||
+    (user as any)?.avatar ||
+    (user as any)?.image ||
+    "/upload-profile-image-icon.png";
+  const myName = user?.name || user?.username || currentUsername || (isHost ? "Host" : "User");
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState("");
@@ -49,29 +53,30 @@ export default function LiveChatPanel({
       const incomingId = msgData._id || msgData.id || `msg-${Date.now()}-${Math.random()}`;
       const senderId = String(msgData.sender || msgData.userId || msgData.user?._id || "");
       const isCurrentUserMsg = Boolean(currentUserId && senderId === currentUserId);
-      const isHostMsg = msgData.role === "host" || (isHost && isCurrentUserMsg);
 
       const username =
+        msgData.name ||
         msgData.username ||
         msgData.senderName ||
         msgData.user?.name ||
         msgData.user?.username ||
-        (isHostMsg ? displayName : isCurrentUserMsg ? displayName : "Viewer");
+        (isCurrentUserMsg ? myName : "User");
 
-      const role: "host" | "cohost" | "viewer" = isHostMsg
-        ? "host"
-        : msgData.role || "viewer";
+      const avatar =
+        msgData.profileImage ||
+        msgData.avatar ||
+        msgData.user?.profileImage ||
+        msgData.user?.avatar ||
+        msgData.user?.image ||
+        (isCurrentUserMsg ? userAvatar : "") ||
+        "/upload-profile-image-icon.png";
 
       const formattedMsg: ChatMessage = {
         id: incomingId,
         sender: senderId || (isCurrentUserMsg ? "current-user" : "user-id"),
         username,
-        avatar:
-          msgData.avatar ||
-          msgData.user?.avatar ||
-          userAvatar ||
-          "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80",
-        role,
+        avatar,
+        role: msgData.role || (isCurrentUserMsg && isHost ? "host" : "viewer"),
         message: incomingText,
         createdAt: msgData.createdAt || new Date().toISOString(),
       };
@@ -103,7 +108,7 @@ export default function LiveChatPanel({
     return () => {
       socket.off("live:new-message", handleNewMessage);
     };
-  }, [liveId, isHost, displayName, currentUserId, user]);
+  }, [liveId, isHost, myName, currentUserId, userAvatar]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -120,8 +125,8 @@ export default function LiveChatPanel({
     const newMsg: ChatMessage = {
       id: clientMsgId,
       sender: currentUserId || "current-user",
-      username: displayName,
-      avatar: userAvatar || "/upload-profile-image-icon.png",
+      username: myName,
+      avatar: userAvatar,
       role: isHost ? "host" : "viewer",
       message: text,
       createdAt: new Date().toISOString(),
@@ -129,6 +134,35 @@ export default function LiveChatPanel({
 
     setMessages((prev) => [...prev, newMsg]);
     const res = await liveSocketService.sendMessage(liveId, text);
+    if (res?.data) {
+      const serverData = res.data;
+      const serverMsgId = serverData.id || serverData._id;
+      const serverName =
+        serverData.name ||
+        serverData.username ||
+        serverData.senderName ||
+        myName;
+      const serverAvatar =
+        serverData.profileImage ||
+        serverData.avatar ||
+        userAvatar;
+
+      if (serverMsgId) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === clientMsgId
+              ? {
+                  ...m,
+                  id: serverMsgId,
+                  username: serverName,
+                  avatar: serverAvatar,
+                  createdAt: serverData.createdAt || m.createdAt,
+                }
+              : m
+          )
+        );
+      }
+    }
     if (!res.success) {
       console.warn("Send message notice:", res.message || res.error);
     }
@@ -140,14 +174,43 @@ export default function LiveChatPanel({
     const newMsg: ChatMessage = {
       id: clientMsgId,
       sender: currentUserId || "current-user",
-      username: displayName,
-      avatar: userAvatar || "/upload-profile-image-icon.png",
+      username: myName,
+      avatar: userAvatar,
       role: isHost ? "host" : "viewer",
       message: emoji,
       createdAt: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, newMsg]);
-    await liveSocketService.sendMessage(liveId, emoji);
+    const res = await liveSocketService.sendMessage(liveId, emoji);
+    if (res?.data) {
+      const serverData = res.data;
+      const serverMsgId = serverData.id || serverData._id;
+      const serverName =
+        serverData.name ||
+        serverData.username ||
+        serverData.senderName ||
+        myName;
+      const serverAvatar =
+        serverData.profileImage ||
+        serverData.avatar ||
+        userAvatar;
+
+      if (serverMsgId) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === clientMsgId
+              ? {
+                  ...m,
+                  id: serverMsgId,
+                  username: serverName,
+                  avatar: serverAvatar,
+                  createdAt: serverData.createdAt || m.createdAt,
+                }
+              : m
+          )
+        );
+      }
+    }
   };
 
   return (
@@ -171,11 +234,15 @@ export default function LiveChatPanel({
             <div key={msg.id} className="flex items-start gap-2.5 text-xs text-white">
               <img
                 src={
-                  msg.avatar ||
-                  "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80"
+                  msg.avatar && msg.avatar.trim() !== ""
+                    ? msg.avatar
+                    : "/upload-profile-image-icon.png"
                 }
-                alt={msg.username}
+                alt={msg.username || "User"}
                 className="w-7 h-7 rounded-full object-cover shrink-0 border border-white/20 mt-0.5"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = "/upload-profile-image-icon.png";
+                }}
               />
               <div className="flex-1 min-w-0">
                 <span className="font-bold text-[#0098EA] text-[12px] block truncate">
