@@ -29,14 +29,14 @@ export default function StreamInfoForm({
       <div className="w-full flex flex-col gap-1.5">
         <div className="flex items-center justify-between">
           <label className="text-sm font-semibold text-gray-800">Live Title</label>
-          <span className={`text-xs font-medium ${titleValue.length > 100 ? "text-red-500" : "text-gray-400"}`}>
-            {titleValue.length}/100
+          <span className={`text-xs font-medium ${titleValue.length > 30 ? "text-red-500" : "text-gray-400"}`}>
+            {titleValue.length}/30
           </span>
         </div>
         <input
           type="text"
           placeholder="e.g. Summer Flash Sale - Xbox Special"
-          maxLength={100}
+          maxLength={30}
           {...register("title")}
           className={`w-full h-[52px] px-4 rounded-[16px] bg-white border text-sm text-gray-800 placeholder:text-gray-400 outline-none transition-all ${
             errors.title
@@ -53,14 +53,14 @@ export default function StreamInfoForm({
       <div className="w-full flex flex-col gap-1.5">
         <div className="flex items-center justify-between">
           <label className="text-sm font-semibold text-gray-800">Description</label>
-          <span className={`text-xs font-medium ${descriptionValue.length > 500 ? "text-red-500" : "text-gray-400"}`}>
-            {descriptionValue.length}/500
+          <span className={`text-xs font-medium ${descriptionValue.length > 300 ? "text-red-500" : "text-gray-400"}`}>
+            {descriptionValue.length}/300
           </span>
         </div>
         <textarea
           rows={4}
           placeholder="Xbox Series X is Microsoft's flagship gaming console, offering unparalleled performance and speed. With its powerful 12TFLOPS GPU processor..."
-          maxLength={500}
+          maxLength={300}
           {...register("description")}
           className={`w-full p-4 rounded-[16px] bg-white border text-sm text-gray-800 placeholder:text-gray-400 outline-none resize-none transition-all leading-relaxed ${
             errors.description

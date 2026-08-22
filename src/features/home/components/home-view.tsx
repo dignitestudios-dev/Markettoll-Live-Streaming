@@ -20,14 +20,14 @@ export default function HomeView() {
   const [activeStreamModal, setActiveStreamModal] = useState<LiveStream | null>(null);
   const [joiningId, setJoiningId] = useState<string | null>(null);
 
-  // Fetch lives via React Query useLivesQuery hook
-  const { data: rawLives, isLoading, refetch } = useLivesQuery();
+  // Fetch lives via React Query useLivesQuery hook with active category
+  const { data: rawLives, isLoading, refetch } = useLivesQuery(selectedCategory);
 
-  // Always fetch fresh lives on component mount
+  // Always fetch fresh lives on component mount or category change
   useEffect(() => {
     refetch();
-    queryClient.invalidateQueries({ queryKey: ["lives"] });
-  }, [refetch]);
+    queryClient.invalidateQueries({ queryKey: ["lives", selectedCategory] });
+  }, [refetch, selectedCategory]);
 
   // Real-time socket updates for created/ended streams
   useEffect(() => {
@@ -49,8 +49,27 @@ export default function HomeView() {
   const streams: LiveStream[] = useMemo(() => {
     if (Array.isArray(rawLives)) {
       return rawLives
-        ?.filter((item: any) => item.status !== "ended" && item.status !== "closed")
-        .map((item) => {
+        ?.filter((item: any) => {
+          if (item.status === "ended" || item.status === "closed") return false;
+          if (!selectedCategory || selectedCategory === "All") return true;
+
+          const itemCat =
+            typeof item.category === "object" && item.category !== null
+              ? (item.category as any)?.name || (item.category as any)?.title || ""
+              : typeof item.category === "string"
+              ? item.category
+              : "";
+
+          return String(itemCat).toLowerCase().trim() === selectedCategory.toLowerCase().trim();
+        })
+        .map((item: any) => {
+          const categoryName =
+            typeof item.category === "object" && item.category !== null
+              ? (item.category as any)?.name || (item.category as any)?.title || "General"
+              : typeof item.category === "string" && item.category
+              ? item.category
+              : "General";
+
           const products: LiveProduct[] = Array.isArray(item.products)
             ? item.products.map((rawP: any, idx: number) => {
                 const p = rawP?.product || rawP;
@@ -80,7 +99,7 @@ export default function HomeView() {
             streamerAvatar:
               (typeof item.host === "object" ? item.host?.avatar : "") ||
               "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
-            category: item.category || "General",
+            category: categoryName,
             title: item.title || "Live Shopping Stream",
             viewerCount: String(item.viewerCount || 0),
             thumbnail: item?.thumbnail || "",
@@ -91,7 +110,7 @@ export default function HomeView() {
         });
     }
     return [];
-  }, [rawLives]);
+  }, [rawLives, selectedCategory]);
 
   const handleJoinStreamRoom = async (liveId: string) => {
     if (joiningId) return; // prevent double-click

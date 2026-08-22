@@ -49,25 +49,56 @@ export default function LiveStreamPageView() {
   const [actualLiveId, setActualLiveId] = useState<string>(liveId);
   const [isLiveEnded, setIsLiveEnded] = useState<boolean>(false);
   const [hostUserId, setHostUserId] = useState<string | undefined>(undefined);
+  const [streamThumbnail, setStreamThumbnail] = useState<string>("");
+  const [streamTitle, setStreamTitle] = useState<string>("");
 
   // Co-host state: viewer becomes cohost after accepting invitation
   const [isCohost, setIsCohost] = useState<boolean>(false);
 
   const [socketProducts, setSocketProducts] = useState<any[]>([]);
 
-  // Sync actual live ID & host user ID from rawLives
+  // 1. Read draft live stream info from sessionStorage
   useEffect(() => {
-    if (Array.isArray(rawLives)) {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = sessionStorage.getItem("draft_live_stream");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed.thumbnail) setStreamThumbnail(parsed.thumbnail);
+          if (parsed.title) setStreamTitle(parsed.title);
+        }
+      } catch (err) {
+        console.warn("Could not read draft_live_stream from sessionStorage:", err);
+      }
+    }
+  }, []);
+
+  // Sync actual live ID & host user ID & thumbnail/title from rawLives (/lives API)
+  useEffect(() => {
+    if (Array.isArray(rawLives) && rawLives.length > 0) {
       const currentLive = rawLives.find(
         (item: any) =>
           item._id === liveId ||
           item.id === liveId ||
+          item._id === actualLiveId ||
+          item.id === actualLiveId ||
+          item.hmsRoomId === liveId ||
+          item.roomId === liveId ||
+          item.hmsRoomId === actualLiveId ||
           item.host?._id === liveId ||
-          item.host?.id === liveId
+          item.host?.id === liveId ||
+          item.host === liveId ||
+          (hostUserId && (item.host?._id === hostUserId || item.host?.id === hostUserId || item.host === hostUserId))
       );
       if (currentLive) {
         if (currentLive._id) {
           setActualLiveId(currentLive._id);
+        }
+        if (currentLive.thumbnail) {
+          setStreamThumbnail(currentLive.thumbnail);
+        }
+        if (currentLive.title) {
+          setStreamTitle(currentLive.title);
         }
         const hostObj = typeof currentLive.host === "object" ? currentLive.host : null;
         const hostId =
@@ -90,7 +121,7 @@ export default function LiveStreamPageView() {
         }
       }
     }
-  }, [rawLives, liveId, user, socketProducts.length]);
+  }, [rawLives, liveId, actualLiveId, hostUserId, user, socketProducts.length]);
 
   // Extract products dynamically from API or Socket ACK for active live session
   const activeLiveProducts: LiveProductItem[] = useMemo(() => {
@@ -351,6 +382,12 @@ export default function LiveStreamPageView() {
             const liveObj = res?.data?.live;
             if (liveObj?._id) {
               setActualLiveId(liveObj._id);
+            }
+            if (liveObj?.thumbnail) {
+              setStreamThumbnail(liveObj.thumbnail);
+            }
+            if (liveObj?.title) {
+              setStreamTitle(liveObj.title);
             }
 
             const hostId = liveObj?.host?._id || liveObj?.host;
@@ -909,7 +946,11 @@ export default function LiveStreamPageView() {
               {isHost && !isLiveEnded && (
                 <button
                   type="button"
-                  onClick={() => setIsCohostModalOpen(true)}
+                  onClick={() => {
+                    setIsCohostModalOpen(true)
+                  queryClient.invalidateQueries({ queryKey: ['live-participants']})
+                  
+                  }}
                   className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
                   title="Invite Co-Host"
                 >
@@ -967,6 +1008,7 @@ export default function LiveStreamPageView() {
                 isMirrored={true}
                 cohosts={cohosts}
                 isLiveEnded={isLiveEnded}
+                thumbnailUrl={streamThumbnail}
                 onToggleMic={async () => {
                   if (isHost || isCohost) {
                     const nextState = !isMicOn;

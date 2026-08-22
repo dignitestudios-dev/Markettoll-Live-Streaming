@@ -8,13 +8,21 @@ export interface APILiveHost {
   [key: string]: any;
 }
 
+export interface APILiveCategory {
+  _id?: string;
+  id?: string;
+  name?: string;
+  title?: string;
+  [key: string]: any;
+}
+
 export interface APILiveItem {
   _id?: string;
   id?: string;
   host?: APILiveHost | string;
   title: string;
   description?: string;
-  category?: string;
+  category?: APILiveCategory | string;
   thumbnail?: string;
   products?: any[];
   coHosts?: any[];
@@ -75,12 +83,18 @@ export async function uploadThumbnailFile(file: File): Promise<string> {
       },
     });
 
+    // Handle array response: data: ["https://markettollbucket.s3.amazonaws.com/..."]
+    if (Array.isArray(response.data?.data) && response.data.data.length > 0) {
+      const firstItem = response.data.data[0];
+      if (typeof firstItem === "string" && firstItem) return firstItem;
+      if (firstItem && typeof firstItem.url === "string" && firstItem.url) return firstItem.url;
+      if (firstItem && typeof firstItem.path === "string" && firstItem.path) return firstItem.path;
+      if (firstItem && typeof firstItem.location === "string" && firstItem.location) return firstItem.location;
+    }
 
-    // Extract attachments array from API response
     const attachments =
       response.data?.data?.attachments ||
-      response.data?.attachments ||
-      (Array.isArray(response.data?.data) ? response.data.data : []);
+      response.data?.attachments;
 
     if (Array.isArray(attachments) && attachments.length > 0) {
       const firstItem = attachments[0];
@@ -96,17 +110,17 @@ export async function uploadThumbnailFile(file: File): Promise<string> {
       response.data?.data?.thumbnail ||
       response.data?.thumbnail;
 
-    if (singleUrl) return singleUrl;
+    if (singleUrl && typeof singleUrl === "string") return singleUrl;
   } catch (error) {
-    console.warn("Multipart thumbnail upload API notice:", error);
+    console.error("Multipart thumbnail upload API notice:", error);
   }
   return "";
 }
 
 /**
- * Resize and compress Image File to keep payload lightweight
+ * Resize and compress Image File while preserving high sharpness and clarity (Full HD 1080p)
  */
-export function compressImageFile(file: File, maxWidth = 640, quality = 0.7): Promise<string> {
+export function compressImageFile(file: File, maxWidth = 1920, quality = 0.92): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -122,6 +136,8 @@ export function compressImageFile(file: File, maxWidth = 640, quality = 0.7): Pr
       canvas.height = height;
       const ctx = canvas.getContext("2d");
       if (ctx) {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
         ctx.drawImage(img, 0, 0, width, height);
         resolve(canvas.toDataURL("image/jpeg", quality));
       } else {
@@ -136,12 +152,20 @@ export function compressImageFile(file: File, maxWidth = 640, quality = 0.7): Pr
   });
 }
 
-export async function fetchLiveStreamsAPI(): Promise<APILiveItem[]> {
+export async function fetchLiveStreamsAPI(category?: string): Promise<APILiveItem[]> {
   try {
-    const response = await axiosInstance.get("/lives");
+    const params: Record<string, any> = {};
+    if (category && category !== "All" && category.trim() !== "") {
+      params.category = category;
+    }
+
+    const response = await axiosInstance.get("/lives", { params });
 
     if (response.data?.success) {
-      return response?.data?.data?.lives;
+      const data = response.data?.data;
+      if (Array.isArray(data?.lives)) return data.lives;
+      if (Array.isArray(data)) return data;
+      return [];
     }
     return [];
   } catch (error) {

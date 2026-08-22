@@ -50,7 +50,7 @@ export default function StreamStatusCard({
         <p className="text-xs text-gray-400 mt-1 font-normal leading-relaxed">
           All checks passed. Your stream is ready to start.
         </p>
-        
+
 
         {/* Checklist Rows */}
         <div className="mt-6 flex flex-col gap-3">

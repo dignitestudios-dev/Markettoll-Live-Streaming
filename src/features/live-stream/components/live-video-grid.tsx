@@ -33,6 +33,7 @@ interface LiveVideoGridProps {
   onToggleMic: () => void;
   onToggleCamera?: () => void;
   isLiveEnded?: boolean;
+  thumbnailUrl?: string;
 }
 
 interface Participant {
@@ -78,6 +79,7 @@ export default function LiveVideoGrid({
   onToggleMic,
   onToggleCamera,
   isLiveEnded = false,
+  thumbnailUrl,
 }: LiveVideoGridProps) {
   const hostVideoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -259,10 +261,15 @@ export default function LiveVideoGrid({
   // Retrieve host's HMS video track (for viewers watching the host)
   const hostVideoTrack = useHMSStore(selectVideoTrackByPeerID(hostPeer?.id));
 
+  // Determine if host video is actively streaming (camera ON)
+  const isHostCameraStreaming = isHost
+    ? isCameraOn
+    : Boolean(hostVideoTrack && hostVideoTrack.enabled !== false && !hostVideoTrack.degraded);
+
   // Active main track ID: Host sees local track; Viewer & Co-Host see Host track
   const mainVideoTrackId = isHost
-    ? localPeerVideoTrack?.id || (localPeer as any)?.videoTrack
-    : hostVideoTrack?.id || (hostPeer as any)?.videoTrack;
+    ? (isCameraOn ? localPeerVideoTrack?.id || (localPeer as any)?.videoTrack : undefined)
+    : (isHostCameraStreaming ? hostVideoTrack?.id || (hostPeer as any)?.videoTrack : undefined);
 
   return (
     <div
@@ -444,7 +451,7 @@ export default function LiveVideoGrid({
       ) : (
         <>
           {/* Main Host Live Video Stream (100ms HMS Video or WebRTC direct video) */}
-          {mainVideoTrackId ? (
+          {mainVideoTrackId && isHostCameraStreaming ? (
             <HMSVideoElement
               trackId={mainVideoTrackId}
               className={`w-full h-full object-contain bg-black transition-opacity duration-300 ${
@@ -463,16 +470,22 @@ export default function LiveVideoGrid({
             /* Fallback Presenter Poster / Thumbnail Image when Camera is OFF or Stream is connecting */
             <div className="relative w-full h-full">
               <img
-                src="https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1200&q=80"
+                src={
+                  thumbnailUrl ||
+                  "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1200&q=80"
+                }
                 alt="Live Stream Presenter Thumbnail"
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
+                style={{ imageRendering: "auto" }}
               />
-              <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center">
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                 <span className="text-white/90 text-xs font-semibold px-4 py-2 rounded-full bg-black/70 backdrop-blur-md border border-white/15 shadow-lg">
                   {isHost
                     ? isCameraOn
                       ? "Connecting Camera..."
-                      : "Camera Off — Presenter Thumbnail Displayed"
+                      : "Camera Off"
+                    : hostPeer
+                    ? "Host Camera Off"
                     : "Connecting to Host Live Video..."}
                 </span>
               </div>

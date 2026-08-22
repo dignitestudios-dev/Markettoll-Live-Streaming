@@ -106,7 +106,8 @@ export default function ThumbnailUploader({
             <img
               src={previewUrl}
               alt="Thumbnail preview"
-              className="w-full h-full object-cover rounded-2xl"
+              className="w-full h-full object-cover rounded-2xl select-none"
+              style={{ imageRendering: "auto" }}
             />
             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
               <span className="text-xs font-semibold text-white bg-black/60 px-3 py-1.5 rounded-full flex items-center gap-1.5">

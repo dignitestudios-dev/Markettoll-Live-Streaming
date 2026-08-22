@@ -11,9 +11,35 @@ import { liveSocketService } from "@/features/live-stream/services/live-socket.s
 export default function PreStreamSetupView() {
   const router = useRouter();
 
-  // Pre-connect live socket on page load
+  const [draftData, setDraftData] = useState<{
+    title: string;
+    description: string;
+    category: string;
+    products: string[];
+    thumbnail: string;
+  }>({
+    title: "",
+    description: "",
+    category: "",
+    products: [],
+    thumbnail: "",
+  });
+
+  // Pre-connect live socket and load draft stream info on page load
   useEffect(() => {
     liveSocketService.connect();
+
+    if (typeof window !== "undefined") {
+      try {
+        const stored = sessionStorage.getItem("draft_live_stream");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          setDraftData((prev) => ({ ...prev, ...parsed }));
+        }
+      } catch (err) {
+        console.warn("Could not read draft_live_stream from sessionStorage:", err);
+      }
+    }
   }, []);
 
   const [isMicOn, setIsMicOn] = useState(true);
@@ -42,43 +68,26 @@ export default function PreStreamSetupView() {
     try {
       setIsStarting(true);
 
-      let draftData = {
-        title: "Live Stream Broadcast",
-        description: "Live shopping broadcast session",
-        category: "General",
-        products: [] as string[],
-        thumbnail: "",
-      };
-
-      if (typeof window !== "undefined") {
-        try {
-          const stored = sessionStorage.getItem("draft_live_stream");
-          if (stored) {
-            const parsed = JSON.parse(stored);
-            draftData = { ...draftData, ...parsed };
-          }
-        } catch (err) {
-          console.warn("Could not read draft_live_stream from sessionStorage:", err);
-        }
-      }
+      const title = draftData.title || "Live Stream Broadcast";
+      const description = draftData.description || "Live shopping broadcast session";
+      const category = draftData.category || "General";
+      const products = draftData.products || [];
+      const thumbnail =
+        draftData.thumbnail ||
+        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80";
 
       const res = await liveSocketService.createLive({
-        title: draftData.title,
-        description: draftData.description,
-        category: draftData.category,
-        products: draftData.products,
-        thumbnail:
-          draftData.thumbnail ||
-          "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80",
+        title,
+        description,
+        category,
+        products,
+        thumbnail,
       });
-
 
       if (!res.success) {
         toast.error(res.message || res.error || "Failed to start live stream.");
         return;
       }
-
-      // toast.success("🔴 Live Stream Starting... Redirecting to broadcast page!");
 
       const liveId =
         res.data?.live?._id ||
@@ -134,6 +143,7 @@ export default function PreStreamSetupView() {
             isCameraOn={isCameraOn}
             onToggleMic={handleToggleMic}
             onToggleCamera={handleToggleCamera}
+            posterImage={draftData.thumbnail}
           />
 
           {/* Stream Status & Control Box */}

@@ -4,10 +4,10 @@ import { fetchLiveStreamsAPI } from "./lives.service";
 //   all: ["lives"] as const,
 // };
 
-export function useLivesQuery() {
+export function useLivesQuery(category?: string) {
   return useQuery({
-    queryKey: ["lives"],
-    queryFn: fetchLiveStreamsAPI,
+    queryKey: ["lives", category || "All"],
+    queryFn: () => fetchLiveStreamsAPI(category),
     staleTime: 0,
     refetchOnMount: "always",
     refetchOnWindowFocus: true,

@@ -8,6 +8,7 @@ interface VideoPreviewCardProps {
   isCameraOn: boolean;
   onToggleMic: () => void;
   onToggleCamera: () => void;
+  posterImage?: string;
 }
 
 export default function VideoPreviewCard({
@@ -15,6 +16,7 @@ export default function VideoPreviewCard({
   isCameraOn,
   onToggleMic,
   onToggleCamera,
+  posterImage,
 }: VideoPreviewCardProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -112,9 +114,10 @@ export default function VideoPreviewCard({
       {(!isCameraOn || !streamActive) && (
         <div className="relative w-full h-full">
           <img
-            src="/images/pre-stream-presenter.png"
+            src={posterImage || "/images/pre-stream-presenter.png"}
             alt="Stream Presenter Preview"
             className="w-full h-full object-cover rounded-[24px]"
+            style={{ imageRendering: "auto" }}
           />
           {!isCameraOn && (
             <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] flex items-center justify-center">
