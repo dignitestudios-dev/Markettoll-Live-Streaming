@@ -75,10 +75,10 @@ export default function HomeView() {
             : [];
 
           return {
-            id: item._id,
-            streamerName: item.host?.name || "Lillian Bakerss",
+            id: item._id || item.id || "",
+            streamerName: (typeof item.host === "object" ? item.host?.name : "") || "Lillian Bakerss",
             streamerAvatar:
-              item.host?.avatar ||
+              (typeof item.host === "object" ? item.host?.avatar : "") ||
               "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
             category: item.category || "General",
             title: item.title || "Live Shopping Stream",
