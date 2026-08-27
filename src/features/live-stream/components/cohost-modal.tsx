@@ -10,6 +10,7 @@ import {
   IoMicOffOutline,
   IoVideocamOutline,
   IoVideocamOffOutline,
+  IoRefreshOutline,
 } from "react-icons/io5";
 import {
   useHMSActions,
@@ -41,7 +42,7 @@ interface CohostModalProps {
 interface ParticipantRowProps {
   uId: string;
   uName: string;
-  uAvatar: string;
+  profileImage: string;
   isCohost: boolean;
   isInvited: boolean;
   liveId: string;
@@ -52,7 +53,7 @@ interface ParticipantRowProps {
 function ParticipantRow({
   uId,
   uName,
-  uAvatar,
+  profileImage,
   isCohost,
   isInvited,
   liveId,
@@ -125,7 +126,7 @@ function ParticipantRow({
       <div className="flex min-w-0 flex-1 items-center gap-[9px]">
         <div className="relative shrink-0">
           <img
-            src={uAvatar}
+            src={profileImage}
             alt={uName}
             className="
               h-[32px] w-[32px]
@@ -337,10 +338,12 @@ export default function CohostModal({
     };
   }, []);
 
-  const { data: participantsData, isLoading } = useLiveParticipantsQuery(
-    liveId,
-    isOpen
-  );
+  const {
+    data: participantsData,
+    isLoading,
+    isFetching,
+    refetch,
+  } = useLiveParticipantsQuery(liveId, isOpen);
 
   if (!isOpen) return null;
 
@@ -368,7 +371,7 @@ export default function CohostModal({
         user: {
           _id: cohost.userId,
           name: cohost.username,
-          avatar: cohost.avatar,
+          profileImage: cohost.avatar,
         },
       } as any);
     }
@@ -428,23 +431,52 @@ export default function CohostModal({
               Invite Guests
             </h3>
 
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close"
-              className="
-                flex h-[30px] w-[30px]
-                items-center justify-center
-                rounded-full
-                bg-[#efefef]
-                text-[#4b4b4b]
-                transition
-                hover:bg-[#e2e2e2]
-                active:scale-95
-              "
-            >
-              <IoClose className="text-[17px]" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => refetch()}
+                disabled={isFetching}
+                title="Refresh viewers list"
+                aria-label="Refresh viewers"
+                className="
+                  flex h-[30px] w-[30px]
+                  items-center justify-center
+                  rounded-full
+                  bg-[#efefef]
+                  text-[#4b4b4b]
+                  transition
+                  hover:bg-[#e2e2e2]
+                  active:scale-95
+                  disabled:opacity-60
+                  cursor-pointer
+                "
+              >
+                <IoRefreshOutline
+                  className={`text-[17px] ${
+                    isFetching ? "animate-spin text-[#0098EA]" : ""
+                  }`}
+                />
+              </button>
+
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Close"
+                className="
+                  flex h-[30px] w-[30px]
+                  items-center justify-center
+                  rounded-full
+                  bg-[#efefef]
+                  text-[#4b4b4b]
+                  transition
+                  hover:bg-[#e2e2e2]
+                  active:scale-95
+                  cursor-pointer
+                "
+              >
+                <IoClose className="text-[17px]" />
+              </button>
+            </div>
           </div>
 
           {/* Guest slots */}
@@ -490,9 +522,17 @@ export default function CohostModal({
             </div>
           </div>
 
-          <p className="mt-4 text-[12px] font-medium text-[#9a9a9a]">
-            Followers currently watching this stream
-          </p>
+          <div className="mt-4 flex items-center justify-between">
+            <p className="text-[12px] font-medium text-[#9a9a9a]">
+              Followers currently watching this stream
+            </p>
+            {isFetching && !isLoading && (
+              <span className="flex items-center gap-1 text-[11px] font-medium text-[#08a9cf] animate-pulse">
+                <IoRefreshOutline className="animate-spin text-xs" />
+                Updating...
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="h-px w-full bg-[#f0f0f0]" />
@@ -500,12 +540,26 @@ export default function CohostModal({
         {/* Participants (Unified List) */}
         <div className="px-4 pb-3 pt-4">
           {isLoading ? (
-            <div className="py-12 text-center text-[13px] text-[#999]">
-              Loading viewers...
+            <div className="py-12 text-center text-[13px] text-[#999] flex flex-col items-center justify-center gap-2">
+              <IoRefreshOutline className="animate-spin text-lg text-[#08a9cf]" />
+              <span>Loading viewers...</span>
             </div>
           ) : mergedList.length === 0 ? (
-            <div className="py-12 text-center text-[13px] text-[#999]">
-              No viewers currently watching this stream.
+            <div className="flex flex-col items-center justify-center py-10 text-center gap-2">
+              <p className="text-[13px] text-[#999]">
+                No viewers currently watching this stream.
+              </p>
+              <button
+                type="button"
+                onClick={() => refetch()}
+                disabled={isFetching}
+                className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-[#f0f9fc] px-3.5 py-1.5 text-xs font-semibold text-[#08a9cf] hover:bg-[#e0f4fa] transition active:scale-95 cursor-pointer disabled:opacity-50"
+              >
+                <IoRefreshOutline
+                  className={`text-sm ${isFetching ? "animate-spin" : ""}`}
+                />
+                Refresh List
+              </button>
             </div>
           ) : (
             <div className="flex max-h-[360px] flex-col gap-2 overflow-y-auto pr-1">
@@ -516,7 +570,7 @@ export default function CohostModal({
                 const uName = item.user?.name || "Viewer";
 
                 const uAvatar =
-                  item.user?.avatar ||
+                  item.user?.profileImage ||
                   "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80";
 
                 const isCohost = cohosts.some((c) => c.userId === uId);
@@ -528,7 +582,7 @@ export default function CohostModal({
                     key={uId}
                     uId={uId}
                     uName={uName}
-                    uAvatar={uAvatar}
+                    profileImage={uAvatar}
                     isCohost={isCohost}
                     isInvited={isInvited}
                     liveId={liveId}

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { Maximize2 } from "lucide-react";
+import { Maximize2, VideoOff, Loader2 } from "lucide-react";
 import {
   IoMicOutline,
   IoMicOffOutline,
@@ -478,15 +478,22 @@ export default function LiveVideoGrid({
                 className="w-full h-full object-contain"
                 style={{ imageRendering: "auto" }}
               />
-              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                <span className="text-white/90 text-xs font-semibold px-4 py-2 rounded-full bg-black/70 backdrop-blur-md border border-white/15 shadow-lg">
-                  {isHost
-                    ? isCameraOn
-                      ? "Connecting Camera..."
-                      : "Camera Off"
-                    : hostPeer
-                    ? "Host Camera Off"
-                    : "Connecting to Host Live Video..."}
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center pointer-events-none">
+                <span className="text-white/90 text-xs font-semibold px-4 py-2 rounded-full bg-black/70 backdrop-blur-md border border-white/15 shadow-lg flex items-center gap-2">
+                  {(isHost ? !isCameraOn : !!hostPeer) ? (
+                    <VideoOff className="w-3.5 h-3.5" />
+                  ) : (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  )}
+                  <span>
+                    {isHost
+                      ? isCameraOn
+                        ? "Connecting Camera..."
+                        : "Camera Off"
+                      : hostPeer
+                      ? "Host Camera Off"
+                      : "Connecting to Host Live Video..."}
+                  </span>
                 </span>
               </div>
             </div>

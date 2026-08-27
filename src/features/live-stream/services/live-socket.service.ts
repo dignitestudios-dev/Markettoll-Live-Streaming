@@ -223,6 +223,16 @@ class LiveSocketService {
   public getParticipants(liveId: string) {
     return this.emitWithAck("live:get-participants", { liveId });
   }
+
+  // 13. live:add-products
+  public addProducts(liveId: string, productIds: string[]) {
+    return this.emitWithAck("live:add-products", { liveId, productIds });
+  }
+
+  // 14. live:remove-products
+  public removeProducts(liveId: string, productIds: string[]) {
+    return this.emitWithAck("live:remove-products", { liveId, productIds });
+  }
 }
 
 export const liveSocketService = new LiveSocketService();

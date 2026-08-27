@@ -75,7 +75,7 @@ export default function LiveProductsCarousel({
 
           {/* Refresh Button */}
          {/* Refresh Button */}
-<button
+{/* <button
   type="button"
   onClick={handleRefresh}
   disabled={isRefreshing}
@@ -104,7 +104,7 @@ export default function LiveProductsCarousel({
       isRefreshing ? "animate-spin" : ""
     }`}
   />
-</button>
+</button> */}
         </div>
       </div>
 

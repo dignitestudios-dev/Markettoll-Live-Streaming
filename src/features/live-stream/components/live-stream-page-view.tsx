@@ -13,6 +13,7 @@ import CohostModal, { CohostParticipant } from "./cohost-modal";
 import CohostInviteModal from "./cohost-invite-modal";
 import CohostProductSelectModal from "./cohost-product-select-modal";
 import EndStreamModal from "./end-stream-modal";
+import LeaveRoomModal from "./leave-room-modal";
 import ShareModal from "./share-modal";
 import ChooseDeliveryModal from "./choose-delivery-modal";
 import { useAuth } from "@/hooks/use-auth";
@@ -21,7 +22,19 @@ import { useLivesQuery } from "@/features/home/api/lives.queries";
 import { extractProductImageUrl } from "@/features/home/api/lives.service";
 import axiosInstance from "@/lib/axios";
 import queryClient from "@/lib/query-client";
-import { fetchLiveStreamsAPI } from "../../home/api/lives.service";
+
+export function resolveProductId(p: any): string {
+  if (!p) return "";
+  if (typeof p === "string") return p;
+  return (
+    p?.product?._id ||
+    p?.product?.id ||
+    (typeof p?.product === "string" ? p.product : "") ||
+    p?._id ||
+    p?.id ||
+    ""
+  );
+}
 
 export default function LiveStreamPageView() {
   const router = useRouter();
@@ -55,7 +68,20 @@ export default function LiveStreamPageView() {
   // Co-host state: viewer becomes cohost after accepting invitation
   const [isCohost, setIsCohost] = useState<boolean>(false);
 
-  const [socketProducts, setSocketProducts] = useState<any[]>([]);
+  const [socketProducts, setSocketProducts] = useState<any[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = sessionStorage.getItem(`live_products_${liveId}`);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch (e) {
+        console.warn("Could not read initial live products from sessionStorage", e);
+      }
+    }
+    return [];
+  });
 
   // 1. Read draft live stream info from sessionStorage
   useEffect(() => {
@@ -66,12 +92,29 @@ export default function LiveStreamPageView() {
           const parsed = JSON.parse(stored);
           if (parsed.thumbnail) setStreamThumbnail(parsed.thumbnail);
           if (parsed.title) setStreamTitle(parsed.title);
+          if (Array.isArray(parsed.products) && parsed.products.length > 0) {
+            setSocketProducts((prev) => (prev.length === 0 ? parsed.products : prev));
+          }
         }
       } catch (err) {
         console.warn("Could not read draft_live_stream from sessionStorage:", err);
       }
     }
   }, []);
+
+  // Auto-redirect to active stream if on base /live-stream without id
+  useEffect(() => {
+    if (!params?.id) {
+      if (typeof window !== "undefined") {
+        const storedHostLiveId =
+          sessionStorage.getItem("current_host_live_id") ||
+          localStorage.getItem("current_host_live_id");
+        if (storedHostLiveId && storedHostLiveId !== "live-session-101") {
+          router.replace(`/live-stream/${storedHostLiveId}`);
+        }
+      }
+    }
+  }, [params?.id, router]);
 
   // Sync actual live ID & host user ID & thumbnail/title from rawLives (/lives API)
   useEffect(() => {
@@ -93,6 +136,9 @@ export default function LiveStreamPageView() {
       if (currentLive) {
         if (currentLive._id) {
           setActualLiveId(currentLive._id);
+          if (!params?.id || params.id === "live-session-101") {
+            router.replace(`/live-stream/${currentLive._id}`);
+          }
         }
         if (currentLive.thumbnail) {
           setStreamThumbnail(currentLive.thumbnail);
@@ -116,93 +162,117 @@ export default function LiveStreamPageView() {
             }
           }
         }
-        if (currentLive.products && Array.isArray(currentLive.products) && socketProducts.length === 0) {
-          setSocketProducts(currentLive.products);
+      }
+    }
+  }, [rawLives, liveId, actualLiveId, hostUserId, user, params?.id, router]);
+
+  // Extract products purely from Socket state for active live session
+  const activeLiveProducts: LiveProductItem[] = useMemo(() => {
+    if (!socketProducts || socketProducts.length === 0) return [];
+
+    // Deduplicate products by unique product ID
+    const dedupedMap = new Map<string, any>();
+    socketProducts.forEach((rawP: any) => {
+      const pId = resolveProductId(rawP);
+      if (pId) {
+        dedupedMap.set(pId, rawP);
+      } else {
+        dedupedMap.set(Math.random().toString(), rawP);
+      }
+    });
+
+    const uniqueRawProducts = Array.from(dedupedMap.values());
+    return uniqueRawProducts.map((rawP: any, idx: number) => {
+      const p = rawP?.product && typeof rawP.product === "object" ? rawP.product : rawP;
+      const productId = resolveProductId(rawP) || `p-${idx}`;
+      const imageUrl = extractProductImageUrl(rawP);
+      const title = p.name || p.title || `Product ${idx + 1}`;
+      // Extract pricing object if available
+      const pricing = rawP?.pricing || p?.pricing || rawP?.product?.pricing;
+      const discountObj = pricing?.discount || rawP?.discount || p?.discount;
+
+      // Selling / effective price
+      let price: number = 10.99;
+      if (pricing?.discountedPrice !== undefined && pricing?.discountedPrice !== null) {
+        price = typeof pricing.discountedPrice === "number" ? pricing.discountedPrice : parseFloat(pricing.discountedPrice) || 0;
+      } else if (p?.discountedPrice !== undefined && p?.discountedPrice !== null) {
+        price = typeof p.discountedPrice === "number" ? p.discountedPrice : parseFloat(p.discountedPrice) || 0;
+      } else if (p?.price !== undefined && p?.price !== null) {
+        price = typeof p.price === "number" ? p.price : parseFloat(p.price) || 0;
+      } else if (rawP?.price !== undefined && rawP?.price !== null) {
+        price = typeof rawP.price === "number" ? rawP.price : parseFloat(rawP.price) || 0;
+      }
+
+      // Original / pre-discount price
+      let originalPrice: number | undefined = undefined;
+      if (pricing?.originalPrice !== undefined && pricing?.originalPrice !== null) {
+        originalPrice = typeof pricing.originalPrice === "number" ? pricing.originalPrice : parseFloat(pricing.originalPrice) || undefined;
+      } else if (p?.originalPrice !== undefined && p?.originalPrice !== null) {
+        originalPrice = typeof p.originalPrice === "number" ? p.originalPrice : parseFloat(p.originalPrice) || undefined;
+      } else if (rawP?.originalPrice !== undefined && rawP?.originalPrice !== null) {
+        originalPrice = typeof rawP.originalPrice === "number" ? rawP.originalPrice : parseFloat(rawP.originalPrice) || undefined;
+      }
+
+      // Format discount badge
+      let discount: string | undefined = undefined;
+      if (discountObj && discountObj.status !== "INACTIVE") {
+        if (discountObj.type === "PERCENTAGE" && discountObj.value !== undefined) {
+          discount = `${discountObj.value}% Discount`;
+        } else if (discountObj.type === "FIXED_AMOUNT" && discountObj.value !== undefined) {
+          discount = `$${discountObj.value} Discount`;
         }
       }
-    }
-  }, [rawLives, liveId, actualLiveId, hostUserId, user, socketProducts.length]);
 
-  // Extract products dynamically from API or Socket ACK for active live session
-  const activeLiveProducts: LiveProductItem[] = useMemo(() => {
-    let rawProducts: any[] = [];
-    if (socketProducts.length > 0) {
-      rawProducts = socketProducts;
-    } else if (Array.isArray(rawLives)) {
-      const currentLive = rawLives.find(
-        (item: any) =>
-          item._id === liveId ||
-          item.id === liveId ||
-          item._id === actualLiveId ||
-          item.id === actualLiveId ||
-          item.host?._id === liveId ||
-          item.host?.id === liveId
-      );
-      if (currentLive && Array.isArray(currentLive.products)) {
-        rawProducts = currentLive.products;
+      if (!discount && pricing?.discountAmount !== undefined && pricing.discountAmount > 0) {
+        discount = `$${pricing.discountAmount} Discount`;
       }
-    }
 
-    if (rawProducts.length > 0) {
-      return rawProducts.map((rawP: any, idx: number) => {
-        const p = rawP?.product || rawP;
-        const imageUrl = extractProductImageUrl(rawP);
-        const title = p.name || p.title || `Product ${idx + 1}`;
-        const price =
-          typeof p.price === "number"
-            ? p.price
-            : parseFloat(p.price) || 10.99;
-        const originalPrice = p.originalPrice
-          ? typeof p.originalPrice === "number"
-            ? p.originalPrice
-            : parseFloat(p.originalPrice)
-          : undefined;
-        const discount =
-          p.discount ||
-          (originalPrice
-            ? `-${Math.round(((originalPrice - price) / originalPrice) * 100)}%`
-            : undefined);
-        const soldCount =
-          p.quantitySold !== undefined ? `${p.quantitySold}` : p.soldCount || "0";
+      if (!discount && typeof p?.discount === "string" && p.discount.trim()) {
+        discount = p.discount;
+      } else if (!discount && originalPrice && originalPrice > price) {
+        const pct = Math.round(((originalPrice - price) / originalPrice) * 100);
+        if (pct > 0) {
+          discount = `${pct}% Discount`;
+        }
+      }
+      const soldCount =
+        p.quantitySold !== undefined ? `${p.quantitySold}` : p.soldCount || "0";
 
-        const uploaderRole =
-          rawP?.uploaderRole ||
-          p?.uploaderRole ||
-          rawP?.role ||
-          p?.role ||
-          rawP?.uploadedByRole ||
-          p?.uploadedByRole ||
-          (rawP?.isCohost ? "co-host" : undefined) ||
-          (rawP?.isHost ? "host" : undefined) ||
-          undefined;
+      const uploaderRole =
+        rawP?.uploaderRole ||
+        p?.uploaderRole ||
+        rawP?.role ||
+        p?.role ||
+        rawP?.uploadedByRole ||
+        p?.uploadedByRole ||
+        (rawP?.isCohost ? "co-host" : undefined) ||
+        (rawP?.isHost ? "host" : undefined) ||
+        undefined;
 
-        const uploaderName =
-          rawP?.uploadedBy?.name ||
-          p?.uploadedBy?.name ||
-          (typeof rawP?.uploadedBy === "string" ? rawP.uploadedBy : undefined) ||
-          (typeof p?.uploadedBy === "string" ? p.uploadedBy : undefined) ||
-          rawP?.uploader?.name ||
-          p?.uploader?.name ||
-          rawP?.uploaderName ||
-          p?.uploaderName ||
-          undefined;
+      const uploaderName =
+        rawP?.uploadedBy?.name ||
+        p?.uploadedBy?.name ||
+        (typeof rawP?.uploadedBy === "string" ? rawP.uploadedBy : undefined) ||
+        (typeof p?.uploadedBy === "string" ? p.uploadedBy : undefined) ||
+        rawP?.uploader?.name ||
+        p?.uploader?.name ||
+        rawP?.uploaderName ||
+        p?.uploaderName ||
+        undefined;
 
-        return {
-          id: p._id || p.id || rawP._id || rawP.id || `p-${idx}`,
-          title,
-          price,
-          originalPrice,
-          discount,
-          image: imageUrl,
-          soldCount,
-          uploaderRole,
-          uploaderName,
-        };
-      });
-    }
-
-    return [];
-  }, [rawLives, socketProducts, liveId, actualLiveId]);
+      return {
+        id: productId,
+        title,
+        price,
+        originalPrice,
+        discount,
+        image: imageUrl,
+        soldCount,
+        uploaderRole,
+        uploaderName,
+      };
+    });
+  }, [socketProducts]);
 
   // 100ms SDK
   const hmsActions = useHMSActions();
@@ -277,6 +347,10 @@ export default function LiveStreamPageView() {
   const [isEndModalOpen, setIsEndModalOpen] = useState(false);
   const [isEndingStream, setIsEndingStream] = useState(false);
 
+  // Leave Room Confirmation Modal state (Viewer only)
+  const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
+  const [isLeavingStream, setIsLeavingStream] = useState(false);
+
   // Share Stream Modal state
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
@@ -315,6 +389,13 @@ export default function LiveStreamPageView() {
             const rawRes = await liveSocketService.joinLive(liveId);
             const res = Array.isArray(rawRes) ? rawRes[0] : rawRes;
             token = res?.data?.token || res?.token || "";
+            const liveObj = res?.data?.live || res?.live;
+            if (liveObj?.products && Array.isArray(liveObj.products)) {
+              setSocketProducts(liveObj.products);
+              if (typeof window !== "undefined") {
+                sessionStorage.setItem(`live_products_${liveObj._id || liveId}`, JSON.stringify(liveObj.products));
+              }
+            }
           } catch (e) {
             console.warn("Host fallback socket token error:", e);
           }
@@ -379,7 +460,7 @@ export default function LiveStreamPageView() {
               }
             }
 
-            const liveObj = res?.data?.live;
+            const liveObj = res?.data?.live || res?.live;
             if (liveObj?._id) {
               setActualLiveId(liveObj._id);
             }
@@ -395,8 +476,12 @@ export default function LiveStreamPageView() {
               setHostUserId(typeof hostId === "string" ? hostId : hostId._id);
             }
 
-            if (liveObj?.products && Array.isArray(liveObj.products)) {
-              setSocketProducts(liveObj.products);
+            const joinedProducts = liveObj?.products || res?.data?.products;
+            if (joinedProducts && Array.isArray(joinedProducts)) {
+              setSocketProducts(joinedProducts);
+              if (typeof window !== "undefined") {
+                sessionStorage.setItem(`live_products_${liveObj?._id || liveId}`, JSON.stringify(joinedProducts));
+              }
             }
 
             token = res?.data?.token || "";
@@ -448,15 +533,31 @@ export default function LiveStreamPageView() {
     };
 
     const handleHostReconnected = async (rawRes: any) => {
-      const res = Array.isArray(rawRes) ? rawRes[0] : rawRes;
+      console.log("Socket event: live:host-reconnected received", rawRes);
+      const res = Array.isArray(rawRes) ? (typeof rawRes[0] === "string" ? rawRes[1] : rawRes[0]) : rawRes;
       const resData = res?.data || res;
+      const liveData = resData?.live || res?.live;
       const freshToken = resData?.token || res?.token;
-      const liveData = resData?.live;
-      const streamLiveId = liveData?._id || resData?.liveId || resData?.roomId || liveId;
+      const streamLiveId =
+        liveData?._id ||
+        liveData?.id ||
+        (typeof liveData === "string" ? liveData : "") ||
+        resData?.liveId ||
+        resData?.roomId ||
+        resData?._id ||
+        res?._id ||
+        liveId;
 
       setIsHost(true);
-      if (liveData?._id) {
-        setActualLiveId(liveData._id);
+      if (streamLiveId) {
+        setActualLiveId(streamLiveId);
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem("current_host_live_id", streamLiveId);
+          localStorage.setItem("current_host_live_id", streamLiveId);
+        }
+        if (!params?.id || params.id !== streamLiveId) {
+          router.replace(`/live-stream/${streamLiveId}`);
+        }
       }
       if (liveData?.host) {
         const hId = typeof liveData.host === "string" ? liveData.host : liveData.host?._id || liveData.host?.id;
@@ -464,12 +565,13 @@ export default function LiveStreamPageView() {
       }
       if (liveData?.products && Array.isArray(liveData.products)) {
         setSocketProducts(liveData.products);
+        if (typeof window !== "undefined" && streamLiveId) {
+          sessionStorage.setItem(`live_products_${streamLiveId}`, JSON.stringify(liveData.products));
+        }
       }
 
       if (typeof window !== "undefined") {
-        sessionStorage.setItem("current_host_live_id", streamLiveId);
-        localStorage.setItem("current_host_live_id", streamLiveId);
-        if (freshToken) {
+        if (freshToken && streamLiveId) {
           sessionStorage.setItem(`hms_token_${streamLiveId}`, freshToken);
           localStorage.setItem(`hms_token_${streamLiveId}`, freshToken);
         }
@@ -490,13 +592,78 @@ export default function LiveStreamPageView() {
       }
     };
 
-    const handleReconnected = async (data: any) => {
-      const freshToken = data?.data?.token || data?.token;
+    const handleReconnected = async (rawRes: any) => {
+      console.log("Socket event: live:reconnected received", rawRes);
+      const res = Array.isArray(rawRes) ? (typeof rawRes[0] === "string" ? rawRes[1] : rawRes[0]) : rawRes;
+      const resData = res?.data || res;
+      const liveData = resData?.live || res?.live;
+      const freshToken = resData?.token || res?.token;
+      const role = String(resData?.role || "").toLowerCase();
+      const isCohostRole = role === "co-host" || role === "cohost" || role === "co_host";
+      const isHostRole = role === "host" || role === "broadcaster";
+      const streamLiveId =
+        liveData?._id ||
+        liveData?.id ||
+        (typeof liveData === "string" ? liveData : "") ||
+        resData?.liveId ||
+        resData?.roomId ||
+        resData?._id ||
+        res?._id ||
+        liveId;
+
+      if (streamLiveId) {
+        setActualLiveId(streamLiveId);
+        if (isHostRole && typeof window !== "undefined") {
+          sessionStorage.setItem("current_host_live_id", streamLiveId);
+          localStorage.setItem("current_host_live_id", streamLiveId);
+        }
+        if (!params?.id || params.id !== streamLiveId) {
+          router.replace(`/live-stream/${streamLiveId}`);
+        }
+      }
+
+      if (liveData?.products && Array.isArray(liveData.products)) {
+        setSocketProducts(liveData.products);
+        if (typeof window !== "undefined" && streamLiveId) {
+          sessionStorage.setItem(`live_products_${streamLiveId}`, JSON.stringify(liveData.products));
+        }
+      }
+
+      if (freshToken && typeof window !== "undefined" && streamLiveId) {
+        sessionStorage.setItem(`hms_token_${streamLiveId}`, freshToken);
+        localStorage.setItem(`hms_token_${streamLiveId}`, freshToken);
+      }
+
+      if (isCohostRole) {
+        setIsCohost(true);
+        const currentUserId = (user as any)?._id || (user as any)?.id;
+        const currentUserName = (user as any)?.name || (user as any)?.username || "Co-Host";
+        if (currentUserId) {
+          setCohosts((prev) => {
+            if (prev.some((c) => c.userId === currentUserId)) return prev;
+            return [...prev, { userId: currentUserId, username: currentUserName, role: "cohost", isMuted: false }];
+          });
+        }
+      } else if (isHostRole) {
+        setIsHost(true);
+      }
+
       if (freshToken) {
         try {
-          await hmsActions.leave();
-          await hmsActions.join({ authToken: freshToken, userName: isHost ? "Host" : "Viewer" });
-          if (!isHost && !isCohost) {
+          await hmsActions.leave().catch(() => {});
+          await hmsActions.join({
+            authToken: freshToken,
+            userName:
+              (user as any)?.name ||
+              (user as any)?.username ||
+              (isHostRole ? "Host" : isCohostRole ? "Co-Host" : "Viewer"),
+          });
+          if (isHostRole || isCohostRole) {
+            await hmsActions.setLocalVideoEnabled(true);
+            await hmsActions.setLocalAudioEnabled(true);
+            setIsCameraOn(true);
+            setIsMicOn(true);
+          } else {
             hmsActions.setLocalVideoEnabled(false);
             hmsActions.setLocalAudioEnabled(false);
           }
@@ -529,11 +696,6 @@ export default function LiveStreamPageView() {
 
     const handleCohostAdded = (data: any) => {
       const resData = data?.data || data;
-      
-      // Fresh API call to get updated live streams data bypassing cache
-      refetch();
-      fetchLiveStreamsAPI();
-      queryClient.refetchQueries({ queryKey: ["lives"] });
 
       const username = resData?.username || resData?.user?.name || resData?.name || "Co-Host";
       toast.success(`${username} joined as co-host.`);
@@ -573,11 +735,6 @@ export default function LiveStreamPageView() {
 
     const handleCohostRemoved = (data: any) => {
       const resData = data?.data || data;
-      
-      // Fresh API call when cohost is removed
-      refetch();
-      queryClient.refetchQueries({ queryKey: ["lives"] });
-
       const userId = typeof resData === "string" ? resData : resData?.userId || resData?.user?._id || resData?._id;
       if (userId) {
         setCohosts((prev) => prev.filter((c) => c.userId !== userId));
@@ -615,10 +772,102 @@ export default function LiveStreamPageView() {
       }
     };
 
-    const handleProductsUpdated = (data: any) => {
-      const prods = data?.data?.products || data?.products || data?.data;
-      if (Array.isArray(prods)) {
-        setSocketProducts(prods);
+    const getProductId = (p: any): string => {
+      return resolveProductId(p);
+    };
+
+    const handleProductAdded = (data: any) => {
+      console.log("Socket event: product added received", data);
+      const payload = Array.isArray(data) ? (typeof data[0] === "string" ? data[1] : data[0]) : data;
+      const resData = payload?.data || payload;
+
+      const incomingList =
+        resData?.products ||
+        resData?.live?.products ||
+        payload?.live?.products ||
+        payload?.products ||
+        resData?.addedProducts ||
+        payload?.addedProducts ||
+        resData?.items ||
+        payload?.items ||
+        resData?.productIds ||
+        payload?.productIds ||
+        (Array.isArray(resData) ? resData : undefined) ||
+        (Array.isArray(payload) ? payload : undefined);
+
+      const singleItem =
+        resData?.product ||
+        payload?.product ||
+        resData?.addedProduct ||
+        payload?.addedProduct;
+
+      const prodsToMerge: any[] = Array.isArray(incomingList)
+        ? incomingList
+        : singleItem
+        ? [singleItem]
+        : [];
+
+      if (prodsToMerge.length > 0) {
+        toast.info("New products added to the live stream!");
+        setSocketProducts((prev) => {
+          const mergedMap = new Map<string, any>();
+          prev.forEach((item) => {
+            const id = resolveProductId(item);
+            if (id) mergedMap.set(id, item);
+          });
+
+          prodsToMerge.forEach((item) => {
+            const id = resolveProductId(item);
+            if (id) {
+              const existing = mergedMap.get(id);
+              if (existing && typeof existing === "object" && typeof item === "string") {
+                // Keep the richer existing object
+              } else if (existing && typeof existing === "object" && typeof item === "object") {
+                mergedMap.set(id, { ...existing, ...item });
+              } else {
+                mergedMap.set(id, item);
+              }
+            } else {
+              mergedMap.set(Math.random().toString(), item);
+            }
+          });
+
+          const updated = Array.from(mergedMap.values());
+          if (typeof window !== "undefined" && actualLiveId) {
+            sessionStorage.setItem(`live_products_${actualLiveId}`, JSON.stringify(updated));
+          }
+          return updated;
+        });
+      }
+    };
+
+    const handleProductRemoved = (data: any) => {
+      console.log("Socket event: product removed received", data);
+      const payload = Array.isArray(data) ? (typeof data[0] === "string" ? data[1] : data[0]) : data;
+      const resData = payload?.data || payload;
+      const prods = resData?.products || payload?.products;
+      const removedId =
+        resData?.productId ||
+        payload?.productId ||
+        resData?.id ||
+        payload?.id;
+      const removedIds: string[] =
+        resData?.productIds ||
+        payload?.productIds ||
+        (Array.isArray(prods) ? prods.map(resolveProductId).filter(Boolean) : []) ||
+        (removedId ? [removedId] : []);
+
+      if (removedIds.length > 0) {
+        setSocketProducts((prev) => {
+          const updated = prev.filter((p: any) => {
+            const pId = resolveProductId(p);
+            return !removedIds.includes(pId);
+          });
+          if (typeof window !== "undefined" && actualLiveId) {
+            sessionStorage.setItem(`live_products_${actualLiveId}`, JSON.stringify(updated));
+          }
+          return updated;
+        });
       }
     };
 
@@ -626,6 +875,7 @@ export default function LiveStreamPageView() {
     socket.on("live:ended", handleLiveEnded);
     socket.on("live:host-reconnected", handleHostReconnected);
     socket.on("live:reconnected", handleReconnected);
+    socket.on("live:viewer-reconnected", handleReconnected);
     socket.on("live:cohost-invited", handleCohostInvited);
     socket.on("live:cohost-added", handleCohostAdded);
     socket.on("live:cohost-rejected", handleCohostRejected);
@@ -635,8 +885,16 @@ export default function LiveStreamPageView() {
     socket.on("live:participant-left", handleCohostRemoved);
     socket.on("live:cohost-muted", handleCohostMuted);
     socket.on("live:cohost-unmuted", handleCohostUnmuted);
-    socket.on("live:products-updated", handleProductsUpdated);
-    socket.on("live:product-added", handleProductsUpdated);
+    socket.on("live:products-added", handleProductAdded);
+    socket.on("live:products-updated", handleProductAdded);
+    socket.on("live:product-added", handleProductAdded);
+    socket.on("live:product-updated", handleProductAdded);
+    socket.on("live:cohost-products-added", handleProductAdded);
+    socket.on("live:cohost-product-added", handleProductAdded);
+    socket.on("live:products", handleProductAdded);
+    socket.on("live:add-products", handleProductAdded);
+    socket.on("live:products-removed", handleProductRemoved);
+    socket.on("live:product-removed", handleProductRemoved);
 
     return () => {
       isMounted = false;
@@ -644,6 +902,7 @@ export default function LiveStreamPageView() {
       socket.off("live:ended", handleLiveEnded);
       socket.off("live:host-reconnected", handleHostReconnected);
       socket.off("live:reconnected", handleReconnected);
+      socket.off("live:viewer-reconnected", handleReconnected);
       socket.off("live:cohost-invited", handleCohostInvited);
       socket.off("live:cohost-added", handleCohostAdded);
       socket.off("live:cohost-rejected", handleCohostRejected);
@@ -653,8 +912,16 @@ export default function LiveStreamPageView() {
       socket.off("live:participant-left", handleCohostRemoved);
       socket.off("live:cohost-muted", handleCohostMuted);
       socket.off("live:cohost-unmuted", handleCohostUnmuted);
-      socket.off("live:products-updated", handleProductsUpdated);
-      socket.off("live:product-added", handleProductsUpdated);
+      socket.off("live:products-added", handleProductAdded);
+      socket.off("live:products-updated", handleProductAdded);
+      socket.off("live:product-added", handleProductAdded);
+      socket.off("live:product-updated", handleProductAdded);
+      socket.off("live:cohost-products-added", handleProductAdded);
+      socket.off("live:cohost-product-added", handleProductAdded);
+      socket.off("live:products", handleProductAdded);
+      socket.off("live:add-products", handleProductAdded);
+      socket.off("live:products-removed", handleProductRemoved);
+      socket.off("live:product-removed", handleProductRemoved);
     };
   }, [liveId, isHost, amIHost, isHMSConnected, hmsActions]);
 
@@ -866,8 +1133,48 @@ export default function LiveStreamPageView() {
     }
   };
 
-  const handleLeaveStream = async () => {
+  const isLeaveConfirmedRef = useRef(false);
+
+  // Intercept browser back button for viewers to prompt Leave Room confirmation modal
+  useEffect(() => {
+    if (isHost || isLiveEnded) return;
+
+    if (typeof window !== "undefined") {
+      window.history.pushState({ liveRoom: true }, "", window.location.href);
+
+      const handlePopState = () => {
+        if (!isLeaveConfirmedRef.current) {
+          window.history.pushState({ liveRoom: true }, "", window.location.href);
+          setIsLeaveModalOpen(true);
+        }
+      };
+
+      window.addEventListener("popstate", handlePopState);
+      return () => {
+        window.removeEventListener("popstate", handlePopState);
+      };
+    }
+  }, [isHost, isLiveEnded]);
+
+  // Automatically leave room when the tab/window is closed
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (liveId && !isHost) {
+        liveSocketService.leaveLive(liveId);
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [liveId, isHost]);
+
+  const handleConfirmLeaveLive = async () => {
     try {
+      setIsLeavingStream(true);
+      isLeaveConfirmedRef.current = true;
       const currentUserId =
         user?._id ||
         (user?.id ? String(user.id) : undefined) ||
@@ -888,10 +1195,14 @@ export default function LiveStreamPageView() {
       queryClient.invalidateQueries({ queryKey: ["lives"] });
       queryClient.refetchQueries({ queryKey: ["lives"] });
       toast.info("You left the live stream.");
+      setIsLeaveModalOpen(false);
       router.push("/");
     } catch (error: any) {
       console.error("Error leaving live stream:", error);
+      setIsLeaveModalOpen(false);
       router.push("/");
+    } finally {
+      setIsLeavingStream(false);
     }
   };
 
@@ -912,26 +1223,26 @@ export default function LiveStreamPageView() {
       <main className="flex-1 w-full max-w-[1280px] mx-auto px-2 sm:px-6 py-4 sm:py-6">
         <div className="w-full bg-[#111622] border border-white/10 rounded-[24px] overflow-hidden shadow-2xl flex flex-col">
           {/* Header Row Inside Dark Card */}
-          <div className="w-full py-3.5 px-4 sm:px-6 bg-[#111622] border-b border-white/10 flex items-center justify-between">
+          <div className="w-full py-2.5 sm:py-3.5 px-3 sm:px-6 bg-[#111622] border-b border-white/10 flex items-center justify-between gap-2">
             {/* Stream Title */}
-            <h2 className="text-sm sm:text-base font-bold text-white tracking-tight">
+            <h2 className="text-xs sm:text-base font-bold text-white tracking-tight truncate min-w-0">
               {isHost ? "My Live Broadcast" : "Watching Broadcast"}
             </h2>
 
             {/* Badges & Actions */}
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
               {/* LIVE Tag */}
               <span
                 className={`${
                   isLiveEnded ? "bg-gray-600" : "bg-[#FF3B30] animate-pulse"
-                } text-white text-[11px] font-black px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-md uppercase tracking-wider`}
+                } text-white text-[10px] sm:text-[11px] font-black px-2 sm:px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-md uppercase tracking-wider whitespace-nowrap shrink-0`}
               >
                 <HiSignal className="text-xs" /> {isLiveEnded ? "ENDED" : "LIVE"}
               </span>
 
               {/* Viewer Count Pill */}
-              <div className="flex items-center gap-1 bg-white/10 backdrop-blur-md px-3 py-1 rounded-full text-white text-xs font-semibold">
-                <Eye className="w-3.5 h-3.5 text-white" />
+              <div className="flex items-center gap-1 bg-white/10 backdrop-blur-md px-2 sm:px-3 py-1 rounded-full text-white text-[11px] sm:text-xs font-semibold whitespace-nowrap shrink-0">
+                <Eye className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-white" />
                 <span>
                   {viewerCount >= 1000
                     ? `${(viewerCount / 1000).toFixed(1)}k`
@@ -939,22 +1250,18 @@ export default function LiveStreamPageView() {
                 </span>
               </div>
 
-              {/* Co-Host / Host Media Control Buttons (Mic & Camera) */}
-             
-
               {/* Invite Co-Host Button (Host Only) */}
               {isHost && !isLiveEnded && (
                 <button
                   type="button"
                   onClick={() => {
-                    setIsCohostModalOpen(true)
-                  queryClient.invalidateQueries({ queryKey: ['live-participants']})
-                  
+                    setIsCohostModalOpen(true);
+                    queryClient.invalidateQueries({ queryKey: ['live-participants'] });
                   }}
-                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
                   title="Invite Co-Host"
                 >
-                  <UserPlus className="w-4 h-4" />
+                  <UserPlus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </button>
               )}
 
@@ -962,10 +1269,10 @@ export default function LiveStreamPageView() {
               <button
                 type="button"
                 onClick={handleShareStream}
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
                 title="Share Stream"
               >
-                <Share2 className="w-4 h-4" />
+                <Share2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </button>
 
               {/* End Livestream Button (Host Only) */}
@@ -973,7 +1280,7 @@ export default function LiveStreamPageView() {
                 <button
                   type="button"
                   onClick={() => setIsEndModalOpen(true)}
-                  className="bg-[#FF3B30] hover:bg-red-600 active:scale-95 text-white text-xs font-bold px-4 py-2 rounded-full shadow-md transition-all cursor-pointer"
+                  className="bg-[#FF3B30] hover:bg-red-600 active:scale-95 text-white text-[11px] sm:text-xs font-bold px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full shadow-md transition-all cursor-pointer whitespace-nowrap shrink-0"
                 >
                   End Livestream
                 </button>
@@ -983,21 +1290,20 @@ export default function LiveStreamPageView() {
               {!isHost && (
                 <button
                   type="button"
-                  onClick={handleLeaveStream}
-                  className="bg-gray-700 hover:bg-gray-600 active:scale-95 text-white text-xs font-bold px-4 py-2.5 rounded-full shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                  onClick={() => setIsLeaveModalOpen(true)}
+                  className="bg-gray-700 hover:bg-gray-600 active:scale-95 text-white text-[11px] sm:text-xs font-bold px-2.5 sm:px-4 py-1.5 sm:py-2.5 rounded-full shadow-md transition-all cursor-pointer flex items-center gap-1 sm:gap-1.5 whitespace-nowrap shrink-0"
                 >
-                  <LogOut className="w-3.5 h-3.5" />
-                  Leave Room
+                  <LogOut className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+                  <span>Leave Room</span>
                 </button>
               )}
             </div>
           </div>
 
-          {/* Body Content Row: Video Grid + Products on Left, Chat on Right */}
-          <div className="w-full flex flex-col lg:flex-row h-auto overflow-hidden">
-            {/* Left Column: Video & Products */}
-            <div className="flex-1 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-white/10 overflow-hidden">
-              {/* Main Video Stream */}
+          {/* Main Broadcast & Chat Section (Video & Chat Aligned Side-by-Side) */}
+          <div className="w-full flex flex-col lg:flex-row items-stretch  border-b border-white/10 overflow-hidden">
+            {/* Main Video Stream */}
+            <div className="flex-1 overflow-hidden">
               <LiveVideoGrid
                 liveId={liveId}
                 isHost={isHost}
@@ -1033,17 +1339,6 @@ export default function LiveStreamPageView() {
                   }
                 }}
               />
-
-              {/* Products Showcase Carousel (Visible to Host, Co-host & Viewers) */}
-              <LiveProductsCarousel
-                products={activeLiveProducts}
-                onAddToCart={handleAddToCart}
-                onRefresh={async () => {
-                  setSocketProducts([]);
-                  await refetch();
-                }}
-                showAddToCart={!isHost && !isCohost}
-              />
             </div>
 
             {/* Right Column: Real-time Audience Chat */}
@@ -1054,6 +1349,17 @@ export default function LiveStreamPageView() {
               isLiveEnded={isLiveEnded}
             />
           </div>
+
+          {/* Products Showcase Carousel (Visible to Host, Co-host & Viewers) */}
+          <LiveProductsCarousel
+            products={activeLiveProducts}
+            onAddToCart={handleAddToCart}
+            onRefresh={async () => {
+              setSocketProducts([]);
+              await refetch();
+            }}
+            showAddToCart={!isHost && !isCohost}
+          />
         </div>
       </main>
 
@@ -1068,13 +1374,23 @@ export default function LiveStreamPageView() {
         />
       )}
 
-      {/* End Stream Confirmation Modal */}
+      {/* End Stream Confirmation Modal (Host only) */}
       {isHost && (
         <EndStreamModal
           isOpen={isEndModalOpen}
           onClose={() => setIsEndModalOpen(false)}
           onConfirm={handleConfirmEndLive}
           isEnding={isEndingStream}
+        />
+      )}
+
+      {/* Leave Stream Confirmation Modal (Viewer only) */}
+      {!isHost && (
+        <LeaveRoomModal
+          isOpen={isLeaveModalOpen}
+          onClose={() => setIsLeaveModalOpen(false)}
+          onConfirm={handleConfirmLeaveLive}
+          isLeaving={isLeavingStream}
         />
       )}
 
@@ -1137,8 +1453,23 @@ export default function LiveStreamPageView() {
         isOpen={isCohostProductModalOpen}
         liveId={actualLiveId || cohostInvite?.liveId || liveId}
         onClose={() => setIsCohostProductModalOpen(false)}
-        onSuccess={(addedProductIds) => {
-          console.log("[Co-Host] Products added to live:", addedProductIds);
+        onSuccess={(addedProductIds, returnedProducts) => {
+          console.log("[Co-Host] Products added to live:", addedProductIds, returnedProducts);
+          if (Array.isArray(returnedProducts) && returnedProducts.length > 0) {
+            setSocketProducts((prev) => {
+              const map = new Map<string, any>();
+              prev.forEach((item) => {
+                const id = resolveProductId(item);
+                if (id) map.set(id, item);
+              });
+              returnedProducts.forEach((item) => {
+                const id = resolveProductId(item);
+                if (id) map.set(id, item);
+              });
+              return Array.from(map.values());
+            });
+          }
+          refetch();
         }}
       />
 

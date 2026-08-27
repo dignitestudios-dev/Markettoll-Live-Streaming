@@ -3,7 +3,7 @@ import axiosInstance from "@/lib/axios";
 export interface ParticipantUser {
   _id: string;
   name?: string;
-  avatar?: string;
+  profileImage?: string;
 }
 
 export interface ParticipantItem {

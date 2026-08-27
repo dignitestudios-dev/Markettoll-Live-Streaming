@@ -214,7 +214,7 @@ export default function LiveChatPanel({
   };
 
   return (
-    <div className="w-full lg:w-[320px] xl:w-[360px] h-[520px] lg:h-full max-h-[600px] bg-[#0E1420] border-l border-white/10 flex flex-col justify-between p-4 shadow-2xl select-none overflow-hidden">
+    <div className="w-full lg:w-[320px] xl:w-[360px] h-[460px] lg:h-[500px] max-h-[500px] bg-[#0E1420] border-l border-white/10 flex flex-col justify-between p-4 shadow-2xl select-none overflow-hidden shrink-0">
       {/* Messages Scroll Area */}
       <div className="flex-1 min-h-0 overflow-y-auto py-2 flex flex-col gap-3 pr-1.5 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
         {messages.length === 0 ? (

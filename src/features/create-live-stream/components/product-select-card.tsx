@@ -50,6 +50,12 @@ export default function ProductSelectCard({
           alt={product.name}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
         />
+        {/* Discount Badge */}
+        {product.discount && (
+          <span className="absolute top-2 left-2 z-10 bg-[#FF3B30] text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-md">
+            {product.discount}
+          </span>
+        )}
       </div>
 
       {/* Product Details */}
@@ -71,9 +77,16 @@ export default function ProductSelectCard({
             </span>
           </div>
 
-          <span className="text-[16.16px] font-[600] text-[#003DAC]">
-            ${product?.price}
-          </span>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-[16.16px] font-[600] text-[#003DAC]">
+              ${typeof product.price === "number" ? product.price.toFixed(2) : product.price}
+            </span>
+            {product.originalPrice !== undefined && product.originalPrice > product.price && (
+              <span className="text-[11px] font-[400] text-gray-400 line-through">
+                ${typeof product.originalPrice === "number" ? product.originalPrice.toFixed(2) : product.originalPrice}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>

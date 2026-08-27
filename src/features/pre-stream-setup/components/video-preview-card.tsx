@@ -1,5 +1,6 @@
 "use client";
 
+import { VideoOff } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { IoMic, IoMicOff, IoVideocam, IoVideocamOff } from "react-icons/io5";
 
@@ -88,7 +89,7 @@ export default function VideoPreviewCard({
   }, [isMicOn]);
 
   return (
-    <div className="relative w-full max-w-[580px] aspect-[4/3] rounded-[24px] overflow-hidden bg-[#121722] border border-white/10 shadow-2xl flex items-center justify-center group">
+    <div className="relative w-full  max-w-[580px] aspect-[4/3] rounded-[24px] overflow-hidden bg-[#121722] border border-white/10 shadow-2xl flex items-center justify-center group">
       {/* Top Left Badge: ON / OFF */}
       <div className="absolute top-4 left-4 z-20 flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/50 backdrop-blur-md border border-white/15 text-white text-xs font-semibold select-none shadow-md">
         <span
@@ -120,10 +121,10 @@ export default function VideoPreviewCard({
             style={{ imageRendering: "auto" }}
           />
           {!isCameraOn && (
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] flex items-center justify-center">
-              <span className="text-white/90 text-xs font-semibold px-4 py-2 rounded-full bg-black/70 backdrop-blur-md border border-white/15 shadow-lg">
-                Camera Off
-              </span>
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="w-12 h-12 rounded-full bg-black/60 border border-white/15 flex items-center justify-center text-white shadow-lg">
+                <VideoOff className="w-6 h-6" />
+              </div>
             </div>
           )}
         </div>

@@ -7,14 +7,14 @@ import { toast } from "react-toastify";
 import { useAuth } from "@/hooks/use-auth";
 import { useSellerProductsQuery } from "@/features/create-live-stream/api/seller-products.queries";
 import { calculateAverageRating } from "@/features/create-live-stream/api/seller-products.service";
-import { addProductsToLive } from "../api/live-products.service";
+import { liveSocketService } from "../services/live-socket.service";
 import queryClient from "@/lib/query-client";
 
 interface CohostProductSelectModalProps {
   isOpen: boolean;
   liveId: string;
   onClose: () => void;
-  onSuccess?: (productIds: string[]) => void;
+  onSuccess?: (productIds: string[], products?: any[]) => void;
 }
 
 export default function CohostProductSelectModal({
@@ -72,11 +72,28 @@ export default function CohostProductSelectModal({
     try {
       setIsSubmitting(true);
     
-      const res = await addProductsToLive(liveId, selectedProductIds);
-      toast.success(res?.message || "Products added to live stream!");
-      onSuccess?.(selectedProductIds);
-      queryClient.invalidateQueries({ queryKey: ["lives"] });
-      onClose();
+      const res = await liveSocketService.addProducts(liveId, selectedProductIds);
+      if (res?.success) {
+        toast.success(res?.message || "Products added to live stream!");
+        const selectedObjects = displayProducts.filter((p) =>
+          selectedProductIds.includes(p.id)
+        );
+        const addedProducts =
+          (Array.isArray(res?.data?.products) && res.data.products.length > 0
+            ? res.data.products
+            : null) ||
+          (Array.isArray(res?.data) && res.data.length > 0 ? res.data : null) ||
+          (Array.isArray((res as any)?.products) && (res as any).products.length > 0
+            ? (res as any).products
+            : null) ||
+          selectedObjects;
+
+        onSuccess?.(selectedProductIds, addedProducts);
+        queryClient.invalidateQueries({ queryKey: ["lives"] });
+        onClose();
+      } else {
+        toast.error(res?.message || "Failed to add products to live stream.");
+      }
     } catch (error: any) {
       console.error("Failed to add products to live:", error);
       toast.error(error?.message || "Failed to add products to live stream.");
@@ -194,6 +211,12 @@ export default function CohostProductSelectModal({
                         alt={product.name}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
+                      {/* Discount Badge */}
+                      {product.discount && (
+                        <span className="absolute top-2 left-2 z-10 bg-[#FF3B30] text-white text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-md">
+                          {product.discount}
+                        </span>
+                      )}
                     </div>
 
                     {/* Details */}
@@ -210,9 +233,16 @@ export default function CohostProductSelectModal({
                           <FaStar className="text-amber-400 text-[10px]" />
                           <span>{formattedRating}</span>
                         </div>
-                        <span className="text-xs font-bold text-[#0098EA]">
-                          ${product.price}
-                        </span>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-xs font-bold text-[#0098EA]">
+                            ${typeof product.price === "number" ? product.price.toFixed(2) : product.price}
+                          </span>
+                          {product.originalPrice !== undefined && product.originalPrice > product.price && (
+                            <span className="text-[10px] text-gray-400 line-through">
+                              ${typeof product.originalPrice === "number" ? product.originalPrice.toFixed(2) : product.originalPrice}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>

@@ -12,7 +12,7 @@ import { extractProductImageUrl } from "../api/lives.service";
 import { liveSocketService } from "@/features/live-stream/services/live-socket.service";
 import queryClient from "@/lib/query-client";
 import { IoClose } from "react-icons/io5";
-import { Eye } from "lucide-react";
+import { Eye, VideoOff } from "lucide-react";
 
 export default function HomeView() {
   const router = useRouter();
@@ -145,6 +145,11 @@ export default function HomeView() {
         if (hostId) {
           sessionStorage.setItem(`live_host_id_${liveId}`, typeof hostId === "string" ? hostId : hostId._id);
         }
+        // Persist products from joinLive socket response
+        const liveProducts = res?.data?.live?.products || res?.data?.products;
+        if (Array.isArray(liveProducts) && liveProducts.length > 0) {
+          sessionStorage.setItem(`live_products_${liveId}`, JSON.stringify(liveProducts));
+        }
       }
     } catch (err) {
       console.warn("Socket join error:", err);
@@ -192,9 +197,15 @@ export default function HomeView() {
             ))}
           </div>
         ) : (
-          <div className="text-center py-16  rounded-2xl my-4">
-            <p className="text-gray-500 font-medium text-base">
-              No live streams active right now.
+          <div className="flex flex-col items-center justify-center text-center py-16 px-4 rounded-2xl my-4">
+            <div className="w-14 h-14  rounded-full flex items-center justify-center mb-3 text-gray-400">
+              <VideoOff className="w-12 h-12 text-[#003DAC]" />
+            </div>
+            <h2 className="text-gray-700 font-semibold text-lg">
+              No Active Streams
+            </h2>
+            <p className="text-gray-500 font-normal text-sm mt-1 max-w-sm">
+              It looks like there are no live streams right now. Check back soon or try another category.
             </p>
           </div>
         )}

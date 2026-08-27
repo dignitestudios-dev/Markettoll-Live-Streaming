@@ -5,7 +5,23 @@ export interface SellerProductApiItem {
   _id: string;
   id?: string;
   name: string;
-  price: number;
+  price?: number;
+  pricing?: {
+    originalPrice?: number;
+    discountedPrice?: number;
+    discountAmount?: number;
+    discount?: {
+      id?: string;
+      type?: string;
+      value?: number;
+      startDate?: string;
+      endDate?: string;
+      status?: string;
+    };
+  };
+  discount?: any;
+  originalPrice?: number;
+  discountedPrice?: number;
   fulfillmentMethod?: {
     selfPickup?: boolean;
     delivery?: boolean;
@@ -65,11 +81,56 @@ export async function fetchSellerProducts(userId: string, page = 1): Promise<Sel
       const delivery = item.fulfillmentMethod?.selfPickup ? "Pickup" : "Delivery";
       const ratingValue = calculateAverageRating(item.avgRating, item.rating);
 
+      const pricing = item.pricing;
+      const discountObj = pricing?.discount || item.discount;
+
+      // Extract effective / selling price
+      let effectivePrice: number = 0;
+      if (pricing?.discountedPrice !== undefined && pricing?.discountedPrice !== null) {
+        effectivePrice = typeof pricing.discountedPrice === "number" ? pricing.discountedPrice : parseFloat(pricing.discountedPrice as any) || 0;
+      } else if (item.discountedPrice !== undefined && item.discountedPrice !== null) {
+        effectivePrice = typeof item.discountedPrice === "number" ? item.discountedPrice : parseFloat(item.discountedPrice as any) || 0;
+      } else if (item.price !== undefined && item.price !== null) {
+        effectivePrice = typeof item.price === "number" ? item.price : parseFloat(item.price as any) || 0;
+      }
+
+      // Extract original price
+      let origPrice: number | undefined = undefined;
+      if (pricing?.originalPrice !== undefined && pricing?.originalPrice !== null) {
+        origPrice = typeof pricing.originalPrice === "number" ? pricing.originalPrice : parseFloat(pricing.originalPrice as any) || undefined;
+      } else if (item.originalPrice !== undefined && item.originalPrice !== null) {
+        origPrice = typeof item.originalPrice === "number" ? item.originalPrice : parseFloat(item.originalPrice as any) || undefined;
+      }
+
+      // Format discount badge
+      let discountBadge: string | undefined = undefined;
+      if (discountObj && discountObj.status !== "INACTIVE") {
+        if (discountObj.type === "PERCENTAGE" && discountObj.value !== undefined) {
+          discountBadge = `${discountObj.value}% Discount`;
+        } else if (discountObj.type === "FIXED_AMOUNT" && discountObj.value !== undefined) {
+          discountBadge = `$${discountObj.value} Discount`;
+        }
+      }
+
+      if (!discountBadge && pricing?.discountAmount !== undefined && pricing.discountAmount > 0) {
+        discountBadge = `$${pricing.discountAmount} Discount`;
+      }
+
+      if (!discountBadge && origPrice && origPrice > effectivePrice) {
+        const pct = Math.round(((origPrice - effectivePrice) / origPrice) * 100);
+        if (pct > 0) {
+          discountBadge = `${pct}% Discount`;
+        }
+      }
+
       return {
         id: item._id || item.id || Math.random().toString(),
         name: item.name || "Product",
         image: img,
-        price: typeof item.price === "number" ? item.price : parseFloat(item.price as any) || 0,
+        price: effectivePrice,
+        originalPrice: origPrice,
+        discount: discountBadge,
+        pricing: item.pricing,
         deliveryType: delivery,
         rating: ratingValue,
         category: item.category || "General",

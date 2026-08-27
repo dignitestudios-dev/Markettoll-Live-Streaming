@@ -105,6 +105,10 @@ export default function PreStreamSetupView() {
         sessionStorage.setItem("current_host_live_id", liveId);
         sessionStorage.setItem(`host_mic_${liveId}`, isMicOn ? "true" : "false");
         sessionStorage.setItem(`host_camera_${liveId}`, isCameraOn ? "true" : "false");
+        const createdProducts = res.data?.live?.products || products || [];
+        if (createdProducts.length > 0) {
+          sessionStorage.setItem(`live_products_${liveId}`, JSON.stringify(createdProducts));
+        }
       }
 
       router.push(`/live-stream/${liveId}`);
