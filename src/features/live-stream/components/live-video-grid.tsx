@@ -97,10 +97,15 @@ export default function LiveVideoGrid({
     ? localPeer
     : hmsPeers.find(
         (peer: HMSPeer) =>
-          peer.roleName?.toLowerCase() === "host" ||
-          peer.roleName?.toLowerCase() === "broadcaster" ||
-          (hostUserId && (peer.customerUserId === hostUserId || peer.id === hostUserId))
+          !peer.isLocal &&
+          (peer.roleName?.toLowerCase().includes("host") ||
+            peer.roleName?.toLowerCase().includes("broadcaster") ||
+            peer.roleName?.toLowerCase().includes("publisher") ||
+            peer.roleName?.toLowerCase().includes("speaker") ||
+            (hostUserId && (peer.customerUserId === hostUserId || peer.id === hostUserId)))
       ) ||
+      hmsPeers.find((peer: HMSPeer) => !peer.isLocal && Boolean(peer.videoTrack)) ||
+      hmsPeers.find((peer: HMSPeer) => !peer.isLocal && !peer.roleName?.toLowerCase().includes("viewer")) ||
       hmsPeers.find((peer: HMSPeer) => !peer.isLocal);
 
   // Filter cohost peers: peers in the room whose role corresponds to a co-host
@@ -264,7 +269,10 @@ export default function LiveVideoGrid({
   // Determine if host video is actively streaming (camera ON)
   const isHostCameraStreaming = isHost
     ? isCameraOn
-    : Boolean(hostVideoTrack && hostVideoTrack.enabled !== false && !hostVideoTrack.degraded);
+    : Boolean(
+        (hostVideoTrack && hostVideoTrack.enabled !== false) ||
+        (hostPeer && hostPeer.videoTrack && hostVideoTrack?.enabled !== false)
+      );
 
   // Active main track ID: Host sees local track; Viewer & Co-Host see Host track
   const mainVideoTrackId = isHost

@@ -72,23 +72,66 @@ export default function HomeView() {
 
           const products: LiveProduct[] = Array.isArray(item.products)
             ? item.products.map((rawP: any, idx: number) => {
-                const p = rawP?.product || rawP;
+                const p = rawP?.product && typeof rawP.product === "object" ? rawP.product : rawP;
                 const imageUrl = extractProductImageUrl(rawP);
                 const title = p.name || p.title || `Product ${idx + 1}`;
-                const priceVal =
-                  typeof p.price === "number"
-                    ? `$${p.price.toFixed(2)}`
-                    : p.price
-                    ? `$${p.price}`
-                    : "$10.99";
+
+                // Extract pricing object if available
+                const pricing = rawP?.pricing || p?.pricing || rawP?.product?.pricing;
+                const discountObj = pricing?.discount || rawP?.discount || p?.discount;
+
+                // Selling / effective price
+                let priceNum: number = 10.99;
+                if (pricing?.discountedPrice !== undefined && pricing?.discountedPrice !== null) {
+                  priceNum = typeof pricing.discountedPrice === "number" ? pricing.discountedPrice : parseFloat(pricing.discountedPrice) || 0;
+                } else if (p?.discountedPrice !== undefined && p?.discountedPrice !== null) {
+                  priceNum = typeof p.discountedPrice === "number" ? p.discountedPrice : parseFloat(p.discountedPrice) || 0;
+                } else if (p?.price !== undefined && p?.price !== null) {
+                  priceNum = typeof p.price === "number" ? p.price : parseFloat(p.price) || 0;
+                } else if (rawP?.price !== undefined && rawP?.price !== null) {
+                  priceNum = typeof rawP.price === "number" ? rawP.price : parseFloat(rawP.price) || 0;
+                }
+
+                // Original / pre-discount price
+                let origPriceNum: number | undefined = undefined;
+                if (pricing?.originalPrice !== undefined && pricing?.originalPrice !== null) {
+                  origPriceNum = typeof pricing.originalPrice === "number" ? pricing.originalPrice : parseFloat(pricing.originalPrice) || undefined;
+                } else if (p?.originalPrice !== undefined && p?.originalPrice !== null) {
+                  origPriceNum = typeof p.originalPrice === "number" ? p.originalPrice : parseFloat(p.originalPrice) || undefined;
+                } else if (rawP?.originalPrice !== undefined && rawP?.originalPrice !== null) {
+                  origPriceNum = typeof rawP.originalPrice === "number" ? rawP.originalPrice : parseFloat(rawP.originalPrice) || undefined;
+                }
+
+                // Format discount badge
+                let discount: string | undefined = undefined;
+                if (discountObj && discountObj.status !== "INACTIVE") {
+                  if (discountObj.type === "PERCENTAGE" && discountObj.value !== undefined) {
+                    discount = `-${discountObj.value}%`;
+                  } else if (discountObj.type === "FIXED_AMOUNT" && discountObj.value !== undefined) {
+                    discount = `-$${discountObj.value}`;
+                  }
+                }
+
+                if (!discount && pricing?.discountAmount !== undefined && pricing.discountAmount > 0) {
+                  discount = `-$${pricing.discountAmount}`;
+                }
+
+                if (!discount && typeof p?.discount === "string" && p.discount.trim()) {
+                  discount = p.discount.startsWith("-") ? p.discount : `-${p.discount}`;
+                } else if (!discount && origPriceNum && origPriceNum > priceNum) {
+                  const pct = Math.round(((origPriceNum - priceNum) / origPriceNum) * 100);
+                  if (pct > 0) {
+                    discount = `-${pct}%`;
+                  }
+                }
 
                 return {
                   id: p._id || p.id || rawP._id || rawP.id || `p-${idx}`,
                   image: imageUrl,
-                  discount: p.discount || "DEAL",
+                  discount: discount || "",
                   title: title,
-                  price: priceVal,
-                  originalPrice: p.originalPrice ? `$${p.originalPrice}` : undefined,
+                  price: `$${priceNum.toFixed(2)}`,
+                  originalPrice: origPriceNum ? `$${origPriceNum.toFixed(2)}` : undefined,
                 };
               })
             : [];
@@ -266,20 +309,42 @@ export default function HomeView() {
                 Featured Live Products ({activeStreamModal.products.length})
               </h4>
               {activeStreamModal.products.length > 0 ? (
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {activeStreamModal.products.map((prod) => (
                     <div
                       key={prod.id}
-                      className="relative aspect-square rounded-xl overflow-hidden bg-gray-100 border border-gray-200 group"
+                      className="flex flex-col gap-1.5 bg-gray-50 p-2 rounded-xl border border-gray-100 group hover:border-[#0098EA]/40 transition-colors"
                     >
-                      <img
-                        src={prod.image}
-                        alt="product"
-                        className="w-full h-full object-cover group-hover:scale-105 transition"
-                      />
-                      <span className="absolute top-1 left-1 bg-[#FF3B30] text-white text-[10px] font-black px-1.5 py-0.5 rounded shadow-xs">
-                        {prod.discount}
-                      </span>
+                      <div className="relative aspect-square rounded-lg overflow-hidden bg-gray-100">
+                        <img
+                          src={prod.image}
+                          alt={prod.title || "product"}
+                          className="w-full h-full object-cover group-hover:scale-105 transition"
+                        />
+                        {prod.discount && (
+                          <span className="absolute top-1 left-1 bg-[#FF3B30] text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-xs z-10">
+                            {prod.discount}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span
+                          className="text-xs font-semibold text-gray-800 truncate"
+                          title={prod.title}
+                        >
+                          {prod.title}
+                        </span>
+                        <div className="flex items-baseline gap-1.5 mt-0.5">
+                          <span className="text-xs font-bold text-[#0098EA]">
+                            {prod.price}
+                          </span>
+                          {prod.originalPrice && (
+                            <span className="text-[10px] text-gray-400 line-through">
+                              {prod.originalPrice}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>

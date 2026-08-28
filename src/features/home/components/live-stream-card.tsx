@@ -86,27 +86,56 @@ export default function LiveStreamCard({
           </div>
 
           {/* Featured Products Row */}
-          <div className="grid grid-cols-4 gap-2 pt-[12px] border-t border-[#F3F4F6] mt-2 min-h-[48px] items-center">
+          <div className="pt-3 border-t border-[#F3F4F6] mt-2">
             {stream.products && stream.products.length > 0 ? (
-              stream.products.slice(0, 4).map((product) => (
-                <div
-                  key={product.id}
-                  className="relative aspect-square w-full rounded-[8px] bg-gray-100 border border-gray-100 group/prod"
-                >
-                  <img
-                    src={product.image}
-                    alt={product.title || "product"}
-                    className="w-full h-full object-cover rounded-[8px] group-hover/prod:scale-105 transition-transform duration-300"
-                  />
-                  {product.discount && (
-                    <span className="absolute -top-[4px] -right-[4px] bg-[#FF3B30] text-white text-[9px] font-semibold px-[6px] py-[2px] rounded-full shadow-xs z-10">
-                      {product.discount}
-                    </span>
-                  )}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    Products ({stream.products.length})
+                  </span>
                 </div>
-              ))
+                <div className="grid grid-cols-4 gap-1.5">
+                  {stream.products.slice(0, 4).map((product) => (
+                    <div
+                      key={product.id}
+                      className="flex flex-col gap-1 min-w-0 group/prod"
+                    >
+                      <div className="relative aspect-square w-full rounded-[8px] bg-gray-100 border border-gray-100 overflow-hidden">
+                        <img
+                          src={product.image}
+                          alt={product.title || "product"}
+                          className="w-full h-full object-cover group-hover/prod:scale-105 transition-transform duration-300"
+                        />
+                        {product.discount && (
+                          <span className="absolute top-1 left-1 bg-[#FF3B30] text-white text-[8px] font-black px-1 py-0.5 rounded shadow-xs z-10 leading-none">
+                            {product.discount}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span
+                          className="text-[10px] font-medium text-gray-700 truncate leading-tight"
+                          title={product.title}
+                        >
+                          {product.title}
+                        </span>
+                        <div className="flex items-baseline gap-1 mt-0.5 flex-wrap">
+                          <span className="text-[10px] font-bold text-[#0098EA] leading-tight">
+                            {product.price}
+                          </span>
+                          {product.originalPrice && (
+                            <span className="text-[8px] text-gray-400 line-through leading-tight">
+                              {product.originalPrice}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             ) : (
-              <div className="col-span-4 text-center text-xs text-gray-400 font-medium py-1">
+              <div className="text-center text-xs text-gray-400 font-medium py-1">
                 No products listed
               </div>
             )}

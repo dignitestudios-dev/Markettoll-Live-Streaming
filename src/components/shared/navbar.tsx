@@ -177,7 +177,7 @@ export default function Navbar() {
               <>
                
 
-                <button
+                {/* <button
                   type="button"
                   onClick={handleOpenNotifications}
                   className="w-[32px] h-[32px] rounded-[10px] bg-white flex items-center justify-center relative cursor-pointer hover:bg-gray-50 transition-colors"
@@ -193,7 +193,7 @@ export default function Navbar() {
                     notifications={notifications}
                     setOpenNotifications={setOpenNotifications}
                   />
-                </button>
+                </button> */}
 
              
 
@@ -335,7 +335,7 @@ export default function Navbar() {
                 className="w-[15px] h-[15px]"
               />
             </Link> */}
-
+{/* 
             <button
               type="button"
               onClick={handleOpenNotifications}
@@ -351,7 +351,7 @@ export default function Navbar() {
                 notifications={notifications}
                 setOpenNotifications={setOpenNotifications}
               />
-            </button>
+            </button> */}
           </>
         )}
 

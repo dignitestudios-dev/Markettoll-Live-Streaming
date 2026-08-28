@@ -150,25 +150,25 @@ export default function LiveProductsCarousel({
                   alt={prod.title}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
-                {/* Discount Tag */}
+                {/* Discount Tag - Top Left */}
                 {prod.discount && (
-                  <span className="absolute top-1.5 left-1.5 bg-[#FF3B30] text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-md">
+                  <span className="absolute top-2 left-2 z-10 bg-[#FF3B30] text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-md">
                     {prod.discount}
                   </span>
                 )}
 
-                {/* Uploader Role Badge — single, clean pill, top-right */}
+                {/* Uploader Role Badge — Bottom Right so it never collides with discount */}
                 {roleLabel && (
                   <span
-                    className={`absolute top-1.5 right-1.5 flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full shadow-md ring-1 ring-white/20 ${roleBadgeClasses}`}
+                    className={`absolute bottom-2 right-2 z-10 flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md ring-1 ring-white/20 backdrop-blur-md ${roleBadgeClasses}`}
                   >
                     {RoleIcon && <RoleIcon className="text-[10px]" />}
                     {roleLabel}
                   </span>
                 )}
 
-                {/* Subtle bottom gradient so the badge/discount never fight the image */}
-                <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
+                {/* Subtle bottom gradient so the role badge always has clear contrast */}
+                <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
               </div>
 
               {/* Title & Price & Uploader info */}
