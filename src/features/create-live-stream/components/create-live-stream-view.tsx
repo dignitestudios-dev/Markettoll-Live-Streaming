@@ -79,23 +79,41 @@ export default function CreateLiveStreamView() {
   return (
     <div className="w-full min-h-screen py-6 sm:py-10 px-4 sm:px-6 lg:px-8 flex justify-center items-start">
       <div className="w-full max-w-[1240px] bg-[#F7F7F7] rounded-[30px] p-6 sm:p-10 lg:p-14 shadow-sm border border-gray-200/60 flex flex-col gap-6">
-        {/* Header: Back button & Title */}
-        <div className="flex items-center gap-3 pb-4 border-b border-gray-200/80">
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="flex items-center gap-1.5 text-sm sm:text-base font-semibold text-[#003DAC] hover:underline transition-all cursor-pointer"
-          >
-            <IoArrowBack className="text-lg" /> Back
-          </button>
+        {/* Header: Back button, Title & Top Submit Button */}
+        <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 pb-4 border-b border-gray-200/80">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="flex items-center gap-1.5 text-sm sm:text-base font-semibold text-[#003DAC] hover:underline transition-all cursor-pointer"
+            >
+              <IoArrowBack className="text-lg" /> Back
+            </button>
 
-          <h1 className="text-xl sm:text-2xl lg:text-[28px] font-bold text-[#003DAC] tracking-tight ml-2">
-            Create Live Stream
-          </h1>
+            <h1 className="text-xl sm:text-2xl lg:text-[28px] font-bold text-[#003DAC] tracking-tight ml-2">
+              Create Live Stream
+            </h1>
+          </div>
+
+          <button
+            type="submit"
+            form="create-stream-form"
+            disabled={isSubmitting}
+            className="w-full sm:w-auto px-6 h-[42px] sm:h-[46px] bg-[#0098EA] hover:bg-[#0082c9] active:scale-[0.99] text-white text-sm sm:text-base font-bold rounded-full shadow-md hover:shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed shrink-0"
+          >
+            {isSubmitting ? (
+              <>
+                <ButtonLoader size={18} className="text-white" />
+                <span>Creating Stream...</span>
+              </>
+            ) : (
+              "Start Live Stream"
+            )}
+          </button>
         </div>
 
         {/* Live Stream Form */}
-        <form onSubmit={handleSubmit(onSubmit)} className="w-full flex flex-col gap-8">
+        <form id="create-stream-form" onSubmit={handleSubmit(onSubmit)} className="w-full flex flex-col gap-8">
           {/* Stream Info (Title, Description, Category, Thumbnail) */}
           <StreamInfoForm
             register={register}
