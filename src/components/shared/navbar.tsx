@@ -175,6 +175,9 @@ export default function Navbar() {
           <div className="hidden lg:flex items-center justify-end gap-3 relative">
             {user?.role !== "influencer" && (
               <>
+
+
+              {/* jhone */}
                
 
                 {/* <button
