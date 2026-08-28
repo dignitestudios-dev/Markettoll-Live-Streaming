@@ -136,7 +136,7 @@ export default function CreateLiveStreamView() {
           />
 
           {/* Submit Button */}
-          <div className="w-full flex justify-center pt-6">
+          {/* <div className="w-full flex justify-center pt-6">
             <button
               type="submit"
               disabled={isSubmitting}
@@ -151,7 +151,7 @@ export default function CreateLiveStreamView() {
                 "Start Live Stream"
               )}
             </button>
-          </div>
+          </div> */}
         </form>
       </div>
     </div>
