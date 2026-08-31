@@ -6,6 +6,9 @@ interface Product {
   category: string;
   thumbnail: string;
   rating: number;
+  quantity?: number;
+  quantitySold?: number;
+  stock?: number;
 }
 
 interface ProductsResponse {

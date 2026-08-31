@@ -125,6 +125,39 @@ export default function HomeView() {
                   }
                 }
 
+                // Quantity (Stock) and Quantity Sold
+                const quantity =
+                  typeof p?.quantity === "number"
+                    ? p.quantity
+                    : typeof rawP?.quantity === "number"
+                    ? rawP.quantity
+                    : typeof p?.stock === "number"
+                    ? p.stock
+                    : typeof rawP?.stock === "number"
+                    ? rawP.stock
+                    : p?.quantity !== undefined && !isNaN(Number(p.quantity))
+                    ? Number(p.quantity)
+                    : rawP?.quantity !== undefined && !isNaN(Number(rawP.quantity))
+                    ? Number(rawP.quantity)
+                    : undefined;
+
+                const quantitySold =
+                  typeof p?.quantitySold === "number"
+                    ? p.quantitySold
+                    : typeof rawP?.quantitySold === "number"
+                    ? rawP.quantitySold
+                    : p?.quantitySold !== undefined && !isNaN(Number(p.quantitySold))
+                    ? Number(p.quantitySold)
+                    : rawP?.quantitySold !== undefined && !isNaN(Number(rawP.quantitySold))
+                    ? Number(rawP.quantitySold)
+                    : typeof p?.soldCount === "number"
+                    ? p.soldCount
+                    : typeof rawP?.soldCount === "number"
+                    ? rawP.soldCount
+                    : p?.soldCount !== undefined && !isNaN(Number(p.soldCount))
+                    ? Number(p.soldCount)
+                    : undefined;
+
                 return {
                   id: p._id || p.id || rawP._id || rawP.id || `p-${idx}`,
                   image: imageUrl,
@@ -132,6 +165,8 @@ export default function HomeView() {
                   title: title,
                   price: `$${priceNum.toFixed(2)}`,
                   originalPrice: origPriceNum ? `$${origPriceNum.toFixed(2)}` : undefined,
+                  quantity,
+                  quantitySold,
                 };
               })
             : [];
@@ -344,6 +379,22 @@ export default function HomeView() {
                             </span>
                           )}
                         </div>
+                        {/* Stock & Sold Badges */}
+                        {(prod.quantity !== undefined || prod.quantitySold !== undefined) && (
+                          <div className="flex items-center gap-1 mt-1 flex-wrap">
+                            {prod.quantity !== undefined && (
+                              <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/60 leading-none">
+                                <span className="w-1 h-1 rounded-full bg-emerald-500" />
+                                Stock: {prod.quantity}
+                              </span>
+                            )}
+                            {prod.quantitySold !== undefined && (
+                              <span className="inline-flex items-center gap-1 text-[9px] font-medium text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/60 leading-none">
+                                Sold: {prod.quantitySold}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}

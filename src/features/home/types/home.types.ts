@@ -5,6 +5,8 @@ export interface LiveProduct {
   title?: string;
   price?: string;
   originalPrice?: string;
+  quantity?: number;
+  quantitySold?: number;
 }
 
 export interface LiveStream {

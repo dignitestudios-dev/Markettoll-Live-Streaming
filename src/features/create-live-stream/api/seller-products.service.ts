@@ -37,6 +37,10 @@ export interface SellerProductApiItem {
   };
   isWishListed?: boolean;
   category?: string;
+  quantity?: number;
+  quantitySold?: number;
+  stock?: number;
+  soldCount?: number;
 }
 
 export function calculateAverageRating(avgRating?: any, fallbackRating?: any): number {
@@ -123,6 +127,29 @@ export async function fetchSellerProducts(userId: string, page = 1): Promise<Sel
         }
       }
 
+      // Quantity (Stock) and Quantity Sold
+      const rawQuantity =
+        typeof item.quantity === "number"
+          ? item.quantity
+          : typeof item.stock === "number"
+          ? item.stock
+          : item.quantity !== undefined && !isNaN(Number(item.quantity))
+          ? Number(item.quantity)
+          : item.stock !== undefined && !isNaN(Number(item.stock))
+          ? Number(item.stock)
+          : undefined;
+
+      const rawQuantitySold =
+        typeof item.quantitySold === "number"
+          ? item.quantitySold
+          : typeof item.soldCount === "number"
+          ? item.soldCount
+          : item.quantitySold !== undefined && !isNaN(Number(item.quantitySold))
+          ? Number(item.quantitySold)
+          : item.soldCount !== undefined && !isNaN(Number(item.soldCount))
+          ? Number(item.soldCount)
+          : undefined;
+
       return {
         id: item._id || item.id || Math.random().toString(),
         name: item.name || "Product",
@@ -134,6 +161,8 @@ export async function fetchSellerProducts(userId: string, page = 1): Promise<Sel
         deliveryType: delivery,
         rating: ratingValue,
         category: item.category || "General",
+        quantity: rawQuantity,
+        quantitySold: rawQuantitySold,
       };
     });
   } catch (error) {

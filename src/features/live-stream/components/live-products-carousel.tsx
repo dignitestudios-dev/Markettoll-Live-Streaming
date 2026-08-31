@@ -18,6 +18,8 @@ export interface LiveProductItem {
   originalPrice?: number;
   discount?: string;
   image: string;
+  quantity?: number;
+  quantitySold?: number;
   soldCount?: string;
   uploaderRole?: string;
   uploaderName?: string;
@@ -195,11 +197,22 @@ export default function LiveProductsCarousel({
                     </span>
                   )}
                 </div>
-                {/* {prod.soldCount && (
-                  <span className="text-[10px] text-gray-400 font-medium">
-                    👁️ {prod.soldCount} Sold
-                  </span>
-                )} */}
+                {/* Stock & Sold Row */}
+                {(prod.quantity !== undefined || prod.quantitySold !== undefined || (prod.soldCount && prod.soldCount !== "0")) && (
+                  <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                    {prod.quantity !== undefined && (
+                      <span className="inline-flex items-center gap-1 text-[9px] font-medium text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded">
+                        <span className="w-1 h-1 rounded-full bg-emerald-400" />
+                        Stock: <span className="font-bold text-emerald-300">{prod.quantity}</span>
+                      </span>
+                    )}
+                    {(prod.quantitySold !== undefined || (prod.soldCount && prod.soldCount !== "0")) && (
+                      <span className="inline-flex items-center gap-1 text-[9px] font-medium text-slate-300 bg-white/10 px-1.5 py-0.5 rounded border border-white/10">
+                        Sold: <span className="font-bold text-white">{prod.quantitySold ?? prod.soldCount}</span>
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Action Buttons (Viewer Only) */}

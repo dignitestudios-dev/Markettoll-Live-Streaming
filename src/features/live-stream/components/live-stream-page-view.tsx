@@ -235,8 +235,41 @@ export default function LiveStreamPageView() {
           discount = `${pct}% Discount`;
         }
       }
+      // Quantity (Stock) and Quantity Sold
+      const rawQuantity =
+        typeof p?.quantity === "number"
+          ? p.quantity
+          : typeof rawP?.quantity === "number"
+          ? rawP.quantity
+          : typeof p?.stock === "number"
+          ? p.stock
+          : typeof rawP?.stock === "number"
+          ? rawP.stock
+          : p?.quantity !== undefined && !isNaN(Number(p.quantity))
+          ? Number(p.quantity)
+          : rawP?.quantity !== undefined && !isNaN(Number(rawP.quantity))
+          ? Number(rawP.quantity)
+          : undefined;
+
+      const rawQuantitySold =
+        typeof p?.quantitySold === "number"
+          ? p.quantitySold
+          : typeof rawP?.quantitySold === "number"
+          ? rawP.quantitySold
+          : p?.quantitySold !== undefined && !isNaN(Number(p.quantitySold))
+          ? Number(p.quantitySold)
+          : rawP?.quantitySold !== undefined && !isNaN(Number(rawP.quantitySold))
+          ? Number(rawP.quantitySold)
+          : typeof p?.soldCount === "number"
+          ? p.soldCount
+          : typeof rawP?.soldCount === "number"
+          ? rawP.soldCount
+          : p?.soldCount !== undefined && !isNaN(Number(p.soldCount))
+          ? Number(p.soldCount)
+          : undefined;
+
       const soldCount =
-        p.quantitySold !== undefined ? `${p.quantitySold}` : p.soldCount || "0";
+        rawQuantitySold !== undefined ? `${rawQuantitySold}` : p?.soldCount || rawP?.soldCount || "0";
 
       const uploaderRole =
         rawP?.uploaderRole ||
@@ -267,6 +300,8 @@ export default function LiveStreamPageView() {
         originalPrice,
         discount,
         image: imageUrl,
+        quantity: rawQuantity,
+        quantitySold: rawQuantitySold,
         soldCount,
         uploaderRole,
         uploaderName,

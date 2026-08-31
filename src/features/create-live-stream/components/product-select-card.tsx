@@ -68,6 +68,23 @@ export default function ProductSelectCard({
           {product.deliveryType}
         </span>
 
+        {/* Stock and Sold Badge Row */}
+        {(product.quantity !== undefined || product.quantitySold !== undefined) && (
+          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+            {product.quantity !== undefined && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                Stock: <span className="font-bold">{product.quantity}</span>
+              </span>
+            )}
+            {product.quantitySold !== undefined && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200/60">
+                Sold: <span className="font-bold">{product.quantitySold}</span>
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Rating and Price Row */}
         <div className="flex items-center justify-between mt-1 pt-1 border-t border-gray-50">
           <div className="flex items-center gap-1 text-xs">

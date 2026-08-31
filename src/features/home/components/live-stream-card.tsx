@@ -129,6 +129,21 @@ export default function LiveStreamCard({
                             </span>
                           )}
                         </div>
+                        {/* Stock & Sold Badges */}
+                        {(product.quantity !== undefined || product.quantitySold !== undefined) && (
+                          <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                            {product.quantity !== undefined && (
+                              <span className="text-[8px] font-semibold text-emerald-700 bg-emerald-50 px-1 py-0.5 rounded border border-emerald-200/60 leading-none">
+                                Stk: {product.quantity}
+                              </span>
+                            )}
+                            {product.quantitySold !== undefined && (
+                              <span className="text-[8px] font-medium text-slate-600 bg-slate-100 px-1 py-0.5 rounded border border-slate-200/60 leading-none">
+                                Sold: {product.quantitySold}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}

@@ -9,6 +9,8 @@ interface Product {
   price: number;
   originalPrice?: number;
   image: string;
+  quantity?: number;
+  quantitySold?: number;
   uploaderRole?: string;
   uploaderName?: string;
 }
@@ -90,6 +92,21 @@ export default function FeaturedProductBanner({
               </span>
             )}
           </div>
+          {(product.quantity !== undefined || product.quantitySold !== undefined) && (
+            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+              {product.quantity !== undefined && (
+                <span className="inline-flex items-center gap-1 text-[9px] font-medium text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded">
+                  <span className="w-1 h-1 rounded-full bg-emerald-400" />
+                  Stock: <span className="font-bold text-emerald-300">{product.quantity}</span>
+                </span>
+              )}
+              {product.quantitySold !== undefined && (
+                <span className="inline-flex items-center gap-1 text-[9px] font-medium text-slate-300 bg-white/10 px-1.5 py-0.5 rounded border border-white/10">
+                  Sold: <span className="font-bold text-white">{product.quantitySold}</span>
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

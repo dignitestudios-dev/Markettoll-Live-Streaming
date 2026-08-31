@@ -22,6 +22,8 @@ export interface SelectableProduct {
   deliveryType: string;
   rating: number;
   category?: string;
+  quantity?: number;
+  quantitySold?: number;
 }
 
 export interface CreateLiveStreamFormData {

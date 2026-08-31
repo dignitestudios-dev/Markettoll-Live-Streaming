@@ -228,6 +228,23 @@ export default function CohostProductSelectModal({
                         {product.deliveryType}
                       </span>
 
+                      {/* Stock and Sold Badge Row */}
+                      {(product.quantity !== undefined || product.quantitySold !== undefined) && (
+                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                          {product.quantity !== undefined && (
+                            <span className="inline-flex items-center gap-1 text-[9px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/60">
+                              <span className="w-1 h-1 rounded-full bg-emerald-500" />
+                              Stock: <span className="font-bold">{product.quantity}</span>
+                            </span>
+                          )}
+                          {product.quantitySold !== undefined && (
+                            <span className="inline-flex items-center gap-1 text-[9px] font-medium text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/60">
+                              Sold: <span className="font-bold">{product.quantitySold}</span>
+                            </span>
+                          )}
+                        </div>
+                      )}
+
                       <div className="flex items-center justify-between mt-1 pt-1 border-t border-gray-100">
                         <div className="flex items-center gap-1 text-[10px] text-gray-600">
                           <FaStar className="text-amber-400 text-[10px]" />
